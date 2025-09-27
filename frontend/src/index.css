@@ -1,0 +1,143 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Ocean-inspired color palette */
+    --background: 210 25% 98%;
+    --foreground: 215 25% 15%;
+
+    --card: 210 15% 96%;
+    --card-foreground: 215 25% 15%;
+
+    --popover: 210 15% 96%;
+    --popover-foreground: 215 25% 15%;
+
+    /* Deep ocean primary */
+    --primary: 215 85% 25%;
+    --primary-foreground: 210 40% 98%;
+    
+    /* Ocean depth gradient */
+    --primary-deep: 220 90% 15%;
+    --primary-surface: 195 75% 45%;
+
+    /* Teal secondary */
+    --secondary: 185 25% 85%;
+    --secondary-foreground: 215 85% 25%;
+
+    --muted: 185 15% 90%;
+    --muted-foreground: 215 15% 45%;
+
+    /* Coral accent */
+    --accent: 15 75% 65%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 185 20% 88%;
+    --input: 185 20% 92%;
+    --ring: 215 85% 25%;
+
+    --radius: 0.5rem;
+
+    /* Ocean gradients */
+    --gradient-ocean: linear-gradient(135deg, hsl(var(--primary-surface)), hsl(var(--primary)));
+    --gradient-depth: linear-gradient(180deg, hsl(var(--primary-surface)), hsl(var(--primary-deep)));
+    --gradient-wave: linear-gradient(45deg, hsl(var(--primary-surface) / 0.1), hsl(var(--primary) / 0.2));
+    
+    /* Data visualization colors */
+    --data-temperature: 15 85% 55%;
+    --data-salinity: 195 75% 45%;
+    --data-depth: 220 85% 35%;
+    --data-bgc: 120 55% 45%;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Deep ocean dark theme */
+    --background: 215 30% 6%;
+    --foreground: 185 20% 92%;
+
+    --card: 215 25% 8%;
+    --card-foreground: 185 20% 92%;
+
+    --popover: 215 25% 8%;
+    --popover-foreground: 185 20% 92%;
+
+    /* Ocean depths primary */
+    --primary: 195 75% 45%;
+    --primary-foreground: 215 30% 6%;
+    
+    /* Dark ocean gradients */
+    --primary-deep: 220 90% 15%;
+    --primary-surface: 195 75% 45%;
+
+    --secondary: 215 15% 15%;
+    --secondary-foreground: 185 20% 92%;
+
+    --muted: 215 15% 12%;
+    --muted-foreground: 185 10% 65%;
+
+    /* Coral accent for dark */
+    --accent: 15 75% 55%;
+    --accent-foreground: 215 30% 6%;
+
+    --destructive: 0 75% 50%;
+    --destructive-foreground: 185 20% 92%;
+
+    --border: 215 15% 18%;
+    --input: 215 15% 15%;
+    --ring: 195 75% 45%;
+
+    /* Dark ocean gradients */
+    --gradient-ocean: linear-gradient(135deg, hsl(var(--primary-surface)), hsl(var(--primary-deep)));
+    --gradient-depth: linear-gradient(180deg, hsl(var(--primary-surface)), hsl(215 30% 6%));
+    --gradient-wave: linear-gradient(45deg, hsl(var(--primary-surface) / 0.2), hsl(var(--primary-deep) / 0.3));
+    
+    /* Data visualization colors for dark */
+    --data-temperature: 15 85% 60%;
+    --data-salinity: 195 75% 50%;
+    --data-depth: 220 85% 40%;
+    --data-bgc: 120 55% 50%;
+
+    --sidebar-background: 215 25% 8%;
+    --sidebar-foreground: 185 20% 92%;
+    --sidebar-primary: 195 75% 45%;
+    --sidebar-primary-foreground: 215 30% 6%;
+    --sidebar-accent: 215 15% 15%;
+    --sidebar-accent-foreground: 185 20% 92%;
+    --sidebar-border: 215 15% 18%;
+    --sidebar-ring: 195 75% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
