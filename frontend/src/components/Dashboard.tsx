@@ -306,46 +306,6 @@ export const Dashboard = () => {
               )}
             </div>
 
-            <div className="grid lg:grid-cols-2 gap-8">
-              {/* Global Map */}
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-4 flex items-center">
-                  <MapPin className="w-5 h-5 mr-2" />
-                  Global Float Distribution
-                </h3>
-                <div className="relative">
-                  <img 
-                    src={globalMapImage} 
-                    alt="Global ARGO Float Distribution" 
-                    className="w-full h-64 object-cover rounded-lg"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-primary-deep/20 to-transparent rounded-lg"></div>
-                  <div className="absolute bottom-4 left-4 text-primary-foreground">
-                    <div className="text-sm font-medium">Indian Ocean Region</div>
-                    <div className="text-xs opacity-80">423 active floats</div>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Data Types */}
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Available Data Types</h3>
-                <div className="space-y-4">
-                  {dataTypes.map((type, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-3 h-3 rounded-full ${type.color}`}></div>
-                        <div>
-                          <div className="font-medium">{type.name}</div>
-                          <div className="text-xs text-muted-foreground">{type.description}</div>
-                        </div>
-                      </div>
-                      <Badge variant="outline">{type.count}</Badge>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </div>
 
             {/* Sample Visualizations */}
             <div className="grid lg:grid-cols-2 gap-8">
@@ -576,24 +536,6 @@ export const Dashboard = () => {
                   </div>
                 </Card>
 
-                {/* Quick Actions */}
-                <Card className="p-6">
-                  <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-                  <div className="space-y-2">
-                    <Button variant="outline" className="w-full justify-start">
-                      <MapPin className="w-4 h-4 mr-2" />
-                      Find Nearest Float
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start">
-                      <Filter className="w-4 h-4 mr-2" />
-                      Filter by Data Type
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start">
-                      <Search className="w-4 h-4 mr-2" />
-                      Search by Region
-                    </Button>
-                  </div>
-                </Card>
               </div>
             </div>
 

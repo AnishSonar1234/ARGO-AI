@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Bot, User, Sparkles, Maximize2, X } from "lucide-react";
+import { Send, Bot, User, Maximize2, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -56,13 +56,6 @@ export const ChatInterface = () => {
     };
   }, [fullscreenMap.isOpen]);
 
-  const sampleQueries = [
-    "Show me a graph of temperature vs depth",
-    "Plot salinity distribution over time",
-    "Where are the ARGO floats located?",
-    "Show me a map of ARGO float positions",
-    "Display ARGO float locations in the Pacific"
-  ];
 
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
@@ -126,28 +119,9 @@ export const ChatInterface = () => {
           </p>
         </div>
 
-        {/* Sample Queries */}
-        <Card className="p-6 mb-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center">
-            <Sparkles className="w-5 h-5 mr-2 text-accent" />
-            Try these sample queries:
-          </h3>
-          <div className="grid gap-2">
-            {sampleQueries.map((query, index) => (
-              <Button
-                key={index}
-                variant="ghost"
-                className="justify-start text-left h-auto py-2 px-3 text-wrap"
-                onClick={() => setInputValue(query)}
-              >
-                "{query}"
-              </Button>
-            ))}
-          </div>
-        </Card>
 
         {/* Chat Messages */}
-        <Card className="h-96 mb-4">
+        <Card className="h-[700px] mb-4">
           <ScrollArea className="h-full p-4">
             <div className="space-y-4">
               {messages.map((message) => (
@@ -171,39 +145,41 @@ export const ChatInterface = () => {
                       )}
                       <div className="flex-1">
                         {message.sender === "ai" ? (
-                          <div className="prose prose-sm dark:prose-invert max-w-none">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {message.content}
-                            </ReactMarkdown>
-                            {message.hasGraph && message.graphImage && (
-                              <div className="mt-4">
-                                <img 
-                                  src={`data:image/png;base64,${message.graphImage}`}
-                                  alt="Generated graph"
-                                  className="max-w-full h-auto rounded-lg border border-border shadow-sm"
-                                />
-                              </div>
-                            )}
-                            {message.hasMap && message.mapHtml && (
-                              <div className="mt-4 relative">
-                                <div 
-                                  className="w-full h-96 rounded-lg border border-border shadow-sm overflow-hidden"
-                                  dangerouslySetInnerHTML={{ 
-                                    __html: atob(message.mapHtml) 
-                                  }}
-                                />
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="absolute top-2 right-2 bg-white/95 hover:bg-white shadow-lg border-2 hover:border-blue-300 transition-all duration-200"
-                                  onClick={() => setFullscreenMap({ isOpen: true, mapHtml: message.mapHtml })}
-                                  title="Open map in fullscreen"
-                                >
-                                  <Maximize2 className="w-4 h-4 mr-1" />
-                                  Fullscreen
-                                </Button>
-                              </div>
-                            )}
+                          <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent hover:scrollbar-thumb-gray-400">
+                            <div className="prose prose-sm dark:prose-invert max-w-none">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {message.content}
+                              </ReactMarkdown>
+                              {message.hasGraph && message.graphImage && (
+                                <div className="mt-4">
+                                  <img 
+                                    src={`data:image/png;base64,${message.graphImage}`}
+                                    alt="Generated graph"
+                                    className="max-w-full h-auto rounded-lg border border-border shadow-sm"
+                                  />
+                                </div>
+                              )}
+                              {message.hasMap && message.mapHtml && (
+                                <div className="mt-4 relative">
+                                  <div 
+                                    className="w-full h-96 rounded-lg border border-border shadow-sm overflow-hidden"
+                                    dangerouslySetInnerHTML={{ 
+                                      __html: message.mapHtml 
+                                    }}
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="absolute top-2 right-2 bg-white/95 hover:bg-white shadow-lg border-2 hover:border-blue-300 transition-all duration-200"
+                                    onClick={() => setFullscreenMap({ isOpen: true, mapHtml: message.mapHtml })}
+                                    title="Open map in fullscreen"
+                                  >
+                                    <Maximize2 className="w-4 h-4 mr-1" />
+                                    Fullscreen
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         ) : (
                           <p className="text-sm">{message.content}</p>
@@ -254,8 +230,8 @@ export const ChatInterface = () => {
         </div>
 
         {/* Backend Notice */}
-        <Card className="mt-6 p-4 bg-accent/10 border-accent/20">
-          <p className="text-sm text-center text-muted-foreground">
+        <Card className="mt-4 p-3 bg-accent/10 border-accent/20">
+          <p className="text-xs text-center text-muted-foreground">
             <strong>Note:</strong> This is a demonstration interface. To enable full AI-powered querying of real ARGO data, you'll need to connect a backend system with database integration.
           </p>
         </Card>
@@ -283,7 +259,7 @@ export const ChatInterface = () => {
               <div 
                 className="w-full h-full rounded-lg border border-border shadow-sm overflow-hidden"
                 dangerouslySetInnerHTML={{ 
-                  __html: atob(fullscreenMap.mapHtml) 
+                  __html: fullscreenMap.mapHtml 
                 }}
               />
             </div>

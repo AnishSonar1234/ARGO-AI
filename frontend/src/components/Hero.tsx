@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MessageCircle, BarChart3, Database, Zap } from "lucide-react";
-import heroImage from "@/assets/argo-hero.jpg";
+import heroImage from "@/assets/argo-underwater.jpg";
 
 interface HeroProps {
   onSectionChange: (section: string) => void;
@@ -39,17 +39,17 @@ export const Hero = ({ onSectionChange }: HeroProps) => {
           className="absolute inset-0 bg-cover bg-center"
           style={{ backgroundImage: `url(${heroImage})` }}
         >
-          <div className="absolute inset-0 bg-primary-deep/30"></div>
+          <div className="absolute inset-0 bg-gradient-to-b from-primary-deep/40 via-primary-deep/20 to-primary-deep/50"></div>
         </div>
         
         <div className="relative z-10 text-center text-primary-foreground max-w-4xl mx-auto px-4">
-          <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
+          <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight drop-shadow-lg">
             Explore Ocean Data with
             <span className="block bg-gradient-to-r from-accent to-primary-surface bg-clip-text text-transparent">
               AI Intelligence
             </span>
           </h1>
-          <p className="text-xl md:text-2xl mb-8 text-primary-foreground/90 max-w-2xl mx-auto">
+          <p className="text-xl md:text-2xl mb-8 text-primary-foreground/95 max-w-2xl mx-auto drop-shadow-md">
             Revolutionary AI-powered platform for querying and visualizing ARGO oceanographic data through natural language conversations.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -64,7 +64,7 @@ export const Hero = ({ onSectionChange }: HeroProps) => {
             <Button 
               size="lg" 
               variant="outline" 
-              className="border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10 px-8 py-3 text-lg"
+              className="border-white/30 text-white hover:bg-white/20 hover:text-white bg-white/10 backdrop-blur-sm px-8 py-3 text-lg font-semibold shadow-lg"
               onClick={() => onSectionChange("dashboard")}
             >
               <BarChart3 className="w-5 h-5 mr-2" />

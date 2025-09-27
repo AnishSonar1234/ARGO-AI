@@ -11,4 +11,7 @@ Pillow
 folium
 geopandas
 shapely
+argopy
+netCDF4
+xarray
 

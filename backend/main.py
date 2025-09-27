@@ -15,6 +15,8 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from openai import OpenAI
 from dotenv import load_dotenv
+import requests
+from datetime import datetime, timedelta
 
 # Load environment variables from .env file
 load_dotenv()
@@ -28,6 +30,166 @@ def create_client() -> OpenAI:
     if not api_key:
         raise RuntimeError("OPENROUTER_API_KEY environment variable is not set")
     return OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
+
+
+def fetch_real_time_argo_data(region=None, days_back=7):
+    """Fetch real-time ARGO float data from ERDDAP server"""
+    try:
+        # ERDDAP server URL for ARGO data
+        base_url = "https://polarwatch.noaa.gov/erddap/tabledap/argoFloats.json"
+        
+        # Calculate date range (last 7 days by default)
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days_back)
+        
+        # Build query parameters
+        params = {
+            'time>=': start_date.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            'time<=': end_date.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            'latitude>=': -90,
+            'latitude<=': 90,
+            'longitude>=': -180,
+            'longitude<=': 180
+        }
+        
+        # Add region-specific constraints if specified
+        if region:
+            if 'pacific' in region.lower():
+                params['longitude>='] = -180
+                params['longitude<='] = -100
+            elif 'atlantic' in region.lower():
+                params['longitude>='] = -100
+                params['longitude<='] = 20
+            elif 'indian' in region.lower():
+                params['longitude>='] = 20
+                params['longitude<='] = 180
+        
+        # Make request to ERDDAP
+        response = requests.get(base_url, params=params, timeout=30)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if 'table' in data and 'rows' in data['table']:
+                # Convert to DataFrame
+                columns = [col['name'] for col in data['table']['columnNames']]
+                rows = data['table']['rows']
+                
+                df = pd.DataFrame(rows, columns=columns)
+                
+                # Clean and process the data
+                df = df.dropna(subset=['latitude', 'longitude'])
+                df['latitude'] = pd.to_numeric(df['latitude'], errors='coerce')
+                df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')
+                df['temperature'] = pd.to_numeric(df.get('temperature', 0), errors='coerce')
+                df['salinity'] = pd.to_numeric(df.get('salinity', 0), errors='coerce')
+                df['depth'] = pd.to_numeric(df.get('depth', 0), errors='coerce')
+                
+                # Add float ID and status
+                df['float_id'] = df.get('platform_number', 'UNKNOWN')
+                df['status'] = 'active'  # Assume active for real-time data
+                df['deployment_date'] = pd.to_datetime(df.get('time', datetime.now()))
+                
+                # Ensure all required columns exist
+                if 'temperature' not in df.columns:
+                    df['temperature'] = np.random.normal(15, 5, len(df))
+                if 'salinity' not in df.columns:
+                    df['salinity'] = np.random.normal(35, 2, len(df))
+                if 'depth' not in df.columns:
+                    df['depth'] = np.random.uniform(0, 2000, len(df))
+                
+                return df.dropna()
+        
+        # Fallback to sample data if real-time fetch fails
+        return generate_sample_data("real-time fallback")
+        
+    except Exception as e:
+        print(f"Error fetching real-time ARGO data: {e}")
+        # Return sample data as fallback
+        return generate_sample_data("real-time fallback")
+
+
+def fetch_argo_float_locations(region=None):
+    """Fetch current ARGO float locations for mapping"""
+    try:
+        # Use a different endpoint for float locations
+        base_url = "https://polarwatch.noaa.gov/erddap/tabledap/argoFloats.json"
+        
+        # Get data from last 30 days to ensure we have recent locations
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=30)
+        
+        params = {
+            'time>=': start_date.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            'time<=': end_date.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            'latitude>=': -90,
+            'latitude<=': 90,
+            'longitude>=': -180,
+            'longitude<=': 180
+        }
+        
+        # Add region constraints
+        if region:
+            if 'pacific' in region.lower():
+                params['longitude>='] = -180
+                params['longitude<='] = -100
+            elif 'atlantic' in region.lower():
+                params['longitude>='] = -100
+                params['longitude<='] = 20
+            elif 'indian' in region.lower():
+                params['longitude>='] = 20
+                params['longitude<='] = 180
+        
+        response = requests.get(base_url, params=params, timeout=30)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if 'table' in data and 'rows' in data['table']:
+                columns = [col['name'] for col in data['table']['columnNames']]
+                rows = data['table']['rows']
+                
+                df = pd.DataFrame(rows, columns=columns)
+                
+                # Process location data
+                df = df.dropna(subset=['latitude', 'longitude'])
+                df['latitude'] = pd.to_numeric(df['latitude'], errors='coerce')
+                df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')
+                
+                # Get unique float locations (latest position for each float)
+                df = df.groupby('platform_number').agg({
+                    'latitude': 'last',
+                    'longitude': 'last',
+                    'time': 'last'
+                }).reset_index()
+                
+                # Add float metadata
+                df['float_id'] = df['platform_number']
+                df['status'] = 'active'
+                df['deployment_date'] = pd.to_datetime(df['time'])
+                df['temperature'] = np.random.normal(15, 5, len(df))  # Placeholder
+                df['salinity'] = np.random.normal(35, 2, len(df))  # Placeholder
+                df['depth'] = np.random.uniform(0, 2000, len(df))  # Placeholder
+                
+                # Ensure all required columns exist with proper data types
+                required_columns = ['latitude', 'longitude', 'float_id', 'status', 'deployment_date', 'temperature', 'salinity', 'depth']
+                for col in required_columns:
+                    if col not in df.columns:
+                        if col == 'status':
+                            df[col] = 'active'
+                        elif col == 'float_id':
+                            df[col] = df.get('platform_number', 'UNKNOWN')
+                        elif col == 'deployment_date':
+                            df[col] = pd.to_datetime(df.get('time', datetime.now()))
+                        else:
+                            df[col] = 0
+                
+                return df.dropna()
+        
+        # Fallback to sample data
+        return generate_sample_data("location fallback")
+        
+    except Exception as e:
+        print(f"Error fetching ARGO float locations: {e}")
+        return generate_sample_data("location fallback")
 
 
 def is_graph_query(message: str) -> bool:
@@ -53,7 +215,30 @@ def is_map_query(message: str) -> bool:
 
 
 def extract_data_from_response(ai_response: str, query: str) -> pd.DataFrame:
-    """Extract meaningful data from AI response and create realistic oceanographic data"""
+    """Extract meaningful data from AI response and fetch real-time oceanographic data"""
+    
+    # Determine region from AI response
+    region = None
+    if 'pacific' in ai_response.lower():
+        region = 'pacific'
+    elif 'atlantic' in ai_response.lower():
+        region = 'atlantic'
+    elif 'indian' in ai_response.lower():
+        region = 'indian'
+    elif 'arctic' in ai_response.lower():
+        region = 'arctic'
+    elif 'southern' in ai_response.lower():
+        region = 'southern'
+    
+    # Try to fetch real-time data first
+    try:
+        real_data = fetch_real_time_argo_data(region=region, days_back=7)
+        if not real_data.empty:
+            return real_data
+    except Exception as e:
+        print(f"Real-time data fetch failed: {e}")
+    
+    # Fallback to enhanced sample data based on AI response
     np.random.seed(42)  # For reproducible results
     
     # Extract numbers and patterns from AI response
@@ -259,47 +444,128 @@ def create_graph(query: str, data: pd.DataFrame, ai_response: str = "") -> str:
 
 
 def extract_location_data_from_response(ai_response: str, query: str) -> pd.DataFrame:
-    """Extract location data from AI response for ARGO float mapping"""
+    """Extract location data from AI response for ARGO float mapping using real-time data"""
+    
+    # Determine region from AI response
+    region = None
+    if 'pacific' in ai_response.lower():
+        region = 'pacific'
+    elif 'atlantic' in ai_response.lower():
+        region = 'atlantic'
+    elif 'indian' in ai_response.lower():
+        region = 'indian'
+    elif 'arctic' in ai_response.lower():
+        region = 'arctic'
+    elif 'southern' in ai_response.lower():
+        region = 'southern'
+    
+    # Try to fetch real-time ARGO float locations first
+    try:
+        real_locations = fetch_argo_float_locations(region=region)
+        if not real_locations.empty:
+            return real_locations
+    except Exception as e:
+        print(f"Real-time location fetch failed: {e}")
+    
+    # Fallback to enhanced sample data based on AI response
     np.random.seed(42)  # For reproducible results
     
-    # Extract coordinates from AI response
+    # Extract coordinates from AI response with more comprehensive patterns
     lat_matches = re.findall(r'latitude[:\s]*(-?\d+\.?\d*)', ai_response.lower())
     lon_matches = re.findall(r'longitude[:\s]*(-?\d+\.?\d*)', ai_response.lower())
     
-    # Extract specific locations mentioned
-    locations = []
-    if 'pacific' in ai_response.lower():
-        locations.extend([(20, -150), (30, -120), (10, -180)])
-    if 'atlantic' in ai_response.lower():
-        locations.extend([(40, -30), (20, -60), (50, -20)])
-    if 'indian' in ai_response.lower():
-        locations.extend([(10, 80), (20, 60), (30, 100)])
-    if 'arctic' in ai_response.lower():
-        locations.extend([(70, -150), (80, -30), (75, 0)])
-    if 'southern' in ai_response.lower():
-        locations.extend([(-60, 0), (-50, 20), (-40, -30)])
+    # Also look for coordinate patterns like "40.5°N, 120.3°W"
+    coord_pattern = r'(-?\d+\.?\d*)[°\s]*[NS]?[,\s]+(-?\d+\.?\d*)[°\s]*[EW]?'
+    coord_matches = re.findall(coord_pattern, ai_response)
     
-    # Use extracted coordinates or generate realistic ones
-    if lat_matches and lon_matches:
-        base_lat = float(lat_matches[0])
-        base_lon = float(lon_matches[0])
-        # Generate points around the mentioned location
-        n_points = 20
-        lats = np.random.normal(base_lat, 5, n_points)
-        lons = np.random.normal(base_lon, 5, n_points)
+    # Extract specific ocean regions and locations mentioned
+    locations = []
+    ocean_regions = []
+    
+    # Pacific Ocean regions
+    if 'pacific' in ai_response.lower():
+        ocean_regions.append('pacific')
+        locations.extend([(20, -150), (30, -120), (10, -180), (40, -160), (15, -140)])
+    if 'north pacific' in ai_response.lower():
+        locations.extend([(45, -150), (50, -130), (35, -180), (40, -160)])
+    if 'south pacific' in ai_response.lower():
+        locations.extend([(-20, -150), (-30, -120), (-10, -180), (-40, -160)])
+    
+    # Atlantic Ocean regions
+    if 'atlantic' in ai_response.lower():
+        ocean_regions.append('atlantic')
+        locations.extend([(40, -30), (20, -60), (50, -20), (35, -40), (25, -50)])
+    if 'north atlantic' in ai_response.lower():
+        locations.extend([(45, -30), (50, -20), (40, -40), (55, -25)])
+    if 'south atlantic' in ai_response.lower():
+        locations.extend([(-20, -30), (-30, -20), (-15, -40), (-25, -35)])
+    
+    # Indian Ocean regions
+    if 'indian' in ai_response.lower():
+        ocean_regions.append('indian')
+        locations.extend([(10, 80), (20, 60), (30, 100), (15, 70), (25, 90)])
+    
+    # Arctic Ocean regions
+    if 'arctic' in ai_response.lower():
+        ocean_regions.append('arctic')
+        locations.extend([(70, -150), (80, -30), (75, 0), (72, -120), (78, -60)])
+    
+    # Southern Ocean regions
+    if 'southern' in ai_response.lower() or 'antarctic' in ai_response.lower():
+        ocean_regions.append('southern')
+        locations.extend([(-60, 0), (-50, 20), (-40, -30), (-55, 10), (-45, -20)])
+    
+    # Extract specific countries/regions mentioned
+    if 'california' in ai_response.lower():
+        locations.extend([(35, -120), (37, -122), (33, -118)])
+    if 'japan' in ai_response.lower():
+        locations.extend([(35, 140), (37, 139), (33, 135)])
+    if 'australia' in ai_response.lower():
+        locations.extend([(-25, 135), (-30, 130), (-20, 140)])
+    if 'europe' in ai_response.lower():
+        locations.extend([(50, 0), (45, 5), (55, -5)])
+    
+    # Use extracted coordinates from AI response
+    extracted_coords = []
+    if lat_matches and lon_matches and len(lat_matches) == len(lon_matches):
+        for lat, lon in zip(lat_matches, lon_matches):
+            extracted_coords.append((float(lat), float(lon)))
+    
+    # Also use coordinate pattern matches
+    for lat, lon in coord_matches:
+        extracted_coords.append((float(lat), float(lon)))
+    
+    # Determine final coordinates
+    if extracted_coords:
+        # Use coordinates extracted from AI response
+        n_points = min(30, len(extracted_coords) * 3)  # Generate more points around extracted locations
+        final_lats = []
+        final_lons = []
+        for base_lat, base_lon in extracted_coords:
+            # Generate points around each extracted location
+            n_around = max(3, n_points // len(extracted_coords))
+            lats = np.random.normal(base_lat, 2, n_around)
+            lons = np.random.normal(base_lon, 2, n_around)
+            final_lats.extend(lats)
+            final_lons.extend(lons)
+        
+        lats = np.array(final_lats[:n_points])
+        lons = np.array(final_lons[:n_points])
+        
     elif locations:
         # Use mentioned ocean regions
         n_points = 30
         all_lats, all_lons = zip(*locations)
-        lats = np.random.choice(all_lats, n_points) + np.random.normal(0, 3, n_points)
-        lons = np.random.choice(all_lons, n_points) + np.random.normal(0, 3, n_points)
+        lats = np.random.choice(all_lats, n_points) + np.random.normal(0, 2, n_points)
+        lons = np.random.choice(all_lons, n_points) + np.random.normal(0, 2, n_points)
+        
     else:
         # Generate global ARGO float distribution
         n_points = 50
         lats = np.random.uniform(-60, 60, n_points)
         lons = np.random.uniform(-180, 180, n_points)
     
-    # Create realistic ARGO float data
+    # Create realistic ARGO float data with ocean-appropriate properties
     data = {
         'latitude': lats,
         'longitude': lons,
@@ -335,10 +601,24 @@ def create_map(query: str, data: pd.DataFrame, ai_response: str = "") -> str:
             tiles='OpenStreetMap'
         )
     
-    # Add different tile layers
-    folium.TileLayer('CartoDB positron', name='Light').add_to(m)
-    folium.TileLayer('CartoDB dark_matter', name='Dark').add_to(m)
-    folium.TileLayer('Stamen Terrain', name='Terrain').add_to(m)
+    # Add different tile layers with proper attribution
+    folium.TileLayer(
+        tiles='CartoDB positron',
+        name='Light',
+        attr='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    ).add_to(m)
+    
+    folium.TileLayer(
+        tiles='CartoDB dark_matter',
+        name='Dark',
+        attr='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    ).add_to(m)
+    
+    folium.TileLayer(
+        tiles='Stamen Terrain',
+        name='Terrain',
+        attr='Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://www.openstreetmap.org/copyright">ODbL</a>.'
+    ).add_to(m)
     
     # Color mapping for different statuses
     status_colors = {
@@ -349,19 +629,34 @@ def create_map(query: str, data: pd.DataFrame, ai_response: str = "") -> str:
     
     # Add ARGO float markers
     for idx, row in data.iterrows():
-        # Determine marker color based on status
-        color = status_colors.get(row['status'], 'blue')
+        # Determine marker color based on status (with fallback)
+        status = row.get('status', 'active')
+        color = status_colors.get(status, 'blue')
         
-        # Create popup content
+        # Create popup content with safe data access
+        float_id = row.get('float_id', f'ARGO_{idx:06d}')
+        lat = row.get('latitude', 0)
+        lon = row.get('longitude', 0)
+        temp = row.get('temperature', 0)
+        sal = row.get('salinity', 0)
+        depth = row.get('depth', 0)
+        deploy_date = row.get('deployment_date', datetime.now())
+        
+        # Format deployment date safely
+        if hasattr(deploy_date, 'strftime'):
+            deploy_str = deploy_date.strftime('%Y-%m-%d')
+        else:
+            deploy_str = str(deploy_date)
+        
         popup_content = f"""
         <div style="width: 200px;">
-            <h4>ARGO Float {row['float_id']}</h4>
-            <p><strong>Location:</strong> {row['latitude']:.2f}°N, {row['longitude']:.2f}°E</p>
-            <p><strong>Status:</strong> {row['status'].title()}</p>
-            <p><strong>Temperature:</strong> {row['temperature']:.1f}°C</p>
-            <p><strong>Salinity:</strong> {row['salinity']:.1f} PSU</p>
-            <p><strong>Depth:</strong> {row['depth']:.0f}m</p>
-            <p><strong>Deployed:</strong> {row['deployment_date'].strftime('%Y-%m-%d')}</p>
+            <h4>ARGO Float {float_id}</h4>
+            <p><strong>Location:</strong> {lat:.2f}°N, {lon:.2f}°E</p>
+            <p><strong>Status:</strong> {status.title()}</p>
+            <p><strong>Temperature:</strong> {temp:.1f}°C</p>
+            <p><strong>Salinity:</strong> {sal:.1f} PSU</p>
+            <p><strong>Depth:</strong> {depth:.0f}m</p>
+            <p><strong>Deployed:</strong> {deploy_str}</p>
         </div>
         """
         
@@ -386,13 +681,13 @@ def create_map(query: str, data: pd.DataFrame, ai_response: str = "") -> str:
     # Add custom legend
     legend_html = '''
     <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 200px; height: 120px; 
-                background-color: white; border:2px solid grey; z-index:9999; 
-                font-size:14px; padding: 10px">
-    <p><b>ARGO Float Status</b></p>
-    <p><i class="fa fa-circle" style="color:green"></i> Active</p>
-    <p><i class="fa fa-circle" style="color:blue"></i> Drifting</p>
-    <p><i class="fa fa-circle" style="color:red"></i> Parked</p>
+                top: 10px; right: 10px; width: 150px; height: 80px; 
+                background-color: white; border:1px solid #ccc; z-index:9999; 
+                font-size:11px; padding: 8px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2)">
+    <p style="margin: 0 0 5px 0; font-weight: bold; font-size: 12px;">ARGO Float Status</p>
+    <p style="margin: 2px 0; font-size: 10px;"><i class="fa fa-circle" style="color:green; font-size: 8px;"></i> Active</p>
+    <p style="margin: 2px 0; font-size: 10px;"><i class="fa fa-circle" style="color:blue; font-size: 8px;"></i> Drifting</p>
+    <p style="margin: 2px 0; font-size: 10px;"><i class="fa fa-circle" style="color:red; font-size: 8px;"></i> Parked</p>
     </div>
     '''
     m.get_root().html.add_child(folium.Element(legend_html))
@@ -406,10 +701,8 @@ def create_map(query: str, data: pd.DataFrame, ai_response: str = "") -> str:
     # Convert map to HTML string
     map_html = m._repr_html_()
     
-    # Convert HTML to base64 for transmission
-    map_base64 = base64.b64encode(map_html.encode()).decode()
-    
-    return map_base64
+    # Return the HTML directly instead of base64 encoding
+    return map_html
 
 
 @app.post("/chat")
@@ -426,8 +719,10 @@ def chat():
                 # First get AI response to extract location data
                 client = create_client()
                 map_prompt = f"""The user asked: "{user_message}". 
-                Provide detailed information about ARGO float locations, including specific coordinates, ocean regions, 
-                and deployment information. Include latitude/longitude coordinates and mention specific ocean basins."""
+                Provide a concise response (2-3 sentences max) about ARGO float locations with specific coordinates. 
+                Include exact latitude and longitude coordinates (e.g., "latitude: 35.5, longitude: -120.3"), 
+                mention specific ocean regions (Pacific, Atlantic, Indian, Arctic, Southern). 
+                Keep the response brief and focused on key locations."""
                 
                 completion = client.chat.completions.create(
                     model="x-ai/grok-4-fast:free",
@@ -455,8 +750,9 @@ def chat():
                 # First get AI response to extract meaningful data
                 client = create_client()
                 graph_prompt = f"""The user asked: "{user_message}". 
-                Provide a detailed oceanographic analysis with specific temperature, salinity, and depth values. 
-                Include realistic oceanographic data points and scientific insights about the ocean profile."""
+                Provide a concise response (2-3 sentences max) with specific temperature, salinity, and depth values. 
+                Include key oceanographic data points and brief scientific insights. 
+                Keep the response brief and focused on the essential data."""
                 
                 completion = client.chat.completions.create(
                     model="x-ai/grok-4-fast:free",
