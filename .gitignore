@@ -91,7 +91,8 @@ dist
 
 # Gatsby files
 .cache/
-public
+# Only ignore public in Gatsby projects (not Vite/React projects)
+# public
 
 # Storybook build outputs
 .out
