@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Thermometer, Droplets, Gauge, Activity, MapPin, Calendar, TrendingUp, Globe, Waves, Microscope, ArrowDown, Search, Filter, Layers, Navigation } from "lucide-react";
 import globalMapImage from "@/assets/argo-global.jpg";
 import { useState } from "react";
-import { EarthGlobe } from "@/components/EarthGlobe";
+import EarthGlobe from "@/components/EarthGlobe";
 
 export const Dashboard = () => {
   const [selectedFloatType, setSelectedFloatType] = useState<string | null>(null);
@@ -385,7 +385,7 @@ export const Dashboard = () => {
               <div className="lg:col-span-2">
                 {viewMode === "3d" ? (
                   <Card className="p-0 overflow-hidden">
-                    <EarthGlobe floatData={activeFloats} />
+                    <EarthGlobe />
                   </Card>
                 ) : (
                   <Card className="p-0 overflow-hidden">
