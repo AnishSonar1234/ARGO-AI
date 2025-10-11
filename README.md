@@ -97,12 +97,14 @@ git clone https://github.com/AnishSonar1234/ARGO-AI.git
 cd ARGO-AI
 ```
 ### 2️⃣ Package installation
+#### a) For backend
 ```bash
 cd backend
 python -m venv venv
 source venv/bin/activate   # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
+#### b) For frotend
 ```bash
 cd ../frontend
 npm install
