@@ -71,20 +71,24 @@ This project is designed for:
 
 ## 🏗️ System Architecture
 
-```text
-+-------------------------+        +---------------------------+
-|      Frontend (React)   |  <---> |     Backend (FastAPI)     |
-|  - Dashboard UI         |        |  - API routes             |
-|  - 3D Globe (Three.js)  |        |  - Data preprocessing     |
-|  - Chatbot interface    |        |  - Chatbot logic (OpenAI) |
-+-------------------------+        +---------------------------+
-              |                                |
-              +-------------+------------------+
-                            |
-                    🌊 Argo API (Real-time Data)
-                            |
-                      🧠 OpenRouter API (LLM)
-```
+The following diagram illustrates the overall architecture of **ARGO-AI**, showing data ingestion, backend processing, AI integration, and frontend visualization.
+
+![ARGO-AI System Architecture](./docs/architecture-diagram.jpg)
+
+### 🔍 Architecture Overview
+
+- **Data Sources:** Argo floats and satellite observations provide continuous measurements (temperature, salinity, pressure, etc.).  
+- **Backend and Data Processing:**  
+  - `Python / xarray` for ingestion and transformation.  
+  - `PostgreSQL` stores relational measurements.  
+  - `FAISS` provides a vector database for semantic search.  
+  - `RAG Pipeline` converts natural language queries into SQL or analytical results via GPT.  
+  - `FastAPI` exposes APIs for data and chatbot interactions.  
+- **Frontend (Streamlit):** An interactive dashboard and chatbot UI with Plotly visualizations.  
+- **Chat Interface:** Users can interact with the system using natural language queries.  
+- **Docker:** Handles containerization and deployment of backend and frontend services.
+
+---
 ## ⚙️ Installation
 
 ### 1️⃣ Clone the Repository
