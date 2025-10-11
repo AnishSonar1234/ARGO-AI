@@ -84,3 +84,19 @@ This project is designed for:
                     🌊 Argo API (Real-time Data)
                             |
                       🧠 OpenRouter API (LLM)
+
+## ⚙️ Installation
+
+### 1️⃣ Clone the Repository
+```bash
+git clone https://github.com/AnishSonar1234/ARGO-AI.git
+cd ARGO-AI
+### 2️⃣ Package installation
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate   # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```bash
+cd ../frontend
+npm install
