@@ -83,4 +83,4 @@ This project is designed for:
                             |
                     🌊 Argo API (Real-time Data)
                             |
-                      🧠 OpenAI API (LLM)
+                      🧠 OpenRouter API (LLM)
