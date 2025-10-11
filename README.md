@@ -11,12 +11,6 @@ It combines advanced **data visualization**, **3D mapping**, and an **AI-powered
 - [🧠 Tech Stack](#-tech-stack)
 - [🏗️ System Architecture](#️-system-architecture)
 - [⚙️ Installation](#️-installation)
-- [🚀 Usage](#-usage)
-- [📂 Folder Structure](#-folder-structure)
-- [🔮 Future Enhancements](#-future-enhancements)
-- [👥 Contributors](#-contributors)
-- [📜 License](#-license)
-
 ---
 
 ## 🌊 Project Overview
