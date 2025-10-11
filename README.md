@@ -73,7 +73,7 @@ This project is designed for:
 
 The following diagram illustrates the overall architecture of **ARGO-AI**, showing data ingestion, backend processing, AI integration, and frontend visualization.
 
-![ARGO-AI System Architecture](./docs/WhatsApp Image 2025-10-11 at 14.57.02_04770dbd.jpg)
+![ARGO-AI System Architecture](./docs/arch.jpg)
 
 ### 🔍 Architecture Overview
 
