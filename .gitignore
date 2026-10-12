@@ -106,3 +106,7 @@ temp/
 build/
 dist/
 *.egg-info/
+
+# Local Vector Database
+chroma_db/
+*.sqlite3

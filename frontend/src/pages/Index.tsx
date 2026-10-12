@@ -13,16 +13,20 @@ const Index = () => {
       case "chat":
         return <ChatInterface />;
       case "dashboard":
-        return <Dashboard />;
+        return <Dashboard onSectionChange={setActiveSection} />;
       default:
         return <Hero onSectionChange={setActiveSection} />;
     }
   };
 
+  const isChat = activeSection === "chat";
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className={`bg-background ${isChat ? "h-screen flex flex-col overflow-hidden" : "min-h-screen"}`}>
       <Navbar activeSection={activeSection} onSectionChange={setActiveSection} />
-      {renderSection()}
+      <div className={isChat ? "flex-1 min-h-0 overflow-hidden" : ""}>
+        {renderSection()}
+      </div>
     </div>
   );
 };

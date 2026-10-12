@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { MessageCircle, BarChart3, Map, Menu } from "lucide-react";
+import { BarChart3, Map, Menu } from "lucide-react";
 import { useState } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { WhaleIcon } from "@/components/WhaleIcon";
 
 interface NavbarProps {
   activeSection: string;
@@ -13,7 +14,7 @@ export const Navbar = ({ activeSection, onSectionChange }: NavbarProps) => {
 
   const navItems = [
     { id: "home", label: "Home", icon: null },
-    { id: "chat", label: "AI Chat", icon: MessageCircle },
+    { id: "chat", label: "Whale Chat", icon: WhaleIcon },
     { id: "dashboard", label: "Dashboard", icon: BarChart3 },
   ];
 
@@ -22,9 +23,12 @@ export const Navbar = ({ activeSection, onSectionChange }: NavbarProps) => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-ocean rounded-lg flex items-center justify-center">
-              <div className="w-4 h-4 bg-primary-foreground rounded-full"></div>
+          <div 
+            onClick={() => onSectionChange("home")}
+            className="flex items-center space-x-2.5 cursor-pointer group"
+          >
+            <div className="w-8 h-8 bg-gradient-ocean rounded-lg flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
+              <WhaleIcon className="w-5 h-5 text-primary-foreground" />
             </div>
             <span className="text-xl font-bold bg-gradient-ocean bg-clip-text text-transparent">
               ARGO AI

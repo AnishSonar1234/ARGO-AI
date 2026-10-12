@@ -14,4 +14,9 @@ shapely
 argopy
 netCDF4
 xarray
-
+erddapy<3.0.0
+langchain
+langchain-community
+langchain-openai
+chromadb
+pydantic
