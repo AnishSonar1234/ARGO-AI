@@ -9,6 +9,9 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 
+# Load environment variables before importing app modules
+load_dotenv()
+
 from app.agent import ocean_agent
 from app.rag.vectorstore import rag_store
 from app.rag.erddap_retriever import (
@@ -17,9 +20,6 @@ from app.rag.erddap_retriever import (
     fetch_real_time_argo_data,
     fetch_argo_float_locations,
 )
-
-# Load environment variables
-load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
@@ -131,9 +131,11 @@ def rag_status():
     return jsonify({
         "status": "ready",
         "vector_store": "ChromaDB",
+        "mode": getattr(rag_store, "mode", "local"),
+        "database": os.getenv("CHROMA_DATABASE", "local_sqlite"),
         "collection": "argo_ocean_knowledge",
         "documents_indexed": rag_store.count(),
-        "framework": "LangChain",
+        "framework": "LangChain & ChromaDB Cloud",
         "nlp_parser": "Pydantic & Rule-Based Intent Extraction"
     })
 

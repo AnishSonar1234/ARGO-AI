@@ -1,8 +1,12 @@
 import os
 import math
 from typing import List, Dict, Any, Optional
+from dotenv import load_dotenv
 import chromadb
 from chromadb.config import Settings
+
+# Ensure environment variables are loaded
+load_dotenv()
 
 # Persistent database directory
 CHROMA_DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..", "chroma_db")
@@ -77,23 +81,111 @@ class ArgoRAGStore:
     """
     ChromaDB-powered Retrieval-Augmented Generation (RAG) Store
     for ARGO-AI oceanographic domain knowledge.
+
+    Connection Priority:
+    1. Chroma Cloud: If CHROMA_API_KEY is defined, connects via chromadb.CloudClient.
+    2. Remote Hosted ChromaDB: If CHROMA_HOST is defined, connects via chromadb.HttpClient.
+    3. Local Persistent ChromaDB: Fallback to local sqlite/chroma_db directory.
     """
     def __init__(self, persist_dir: str = CHROMA_DATA_PATH):
         self.persist_dir = persist_dir
+        self.client = None
+        self.mode = "local"
+        self._init_client()
+        try:
+            self.collection = self.client.get_or_create_collection(name=COLLECTION_NAME)
+        except Exception as e:
+            print(f"[RAG] Warning on get_or_create_collection ({e}). Falling back to local PersistentClient...")
+            os.makedirs(self.persist_dir, exist_ok=True)
+            self.client = chromadb.PersistentClient(
+                path=self.persist_dir,
+                settings=Settings(anonymized_telemetry=False)
+            )
+            self.mode = "local"
+            self.collection = self.client.get_or_create_collection(name=COLLECTION_NAME)
+
+        self._ensure_knowledge_seeded()
+
+    def _init_client(self):
+        """Initializes Chroma client based on environment configuration."""
+        # 1. Chroma Cloud (Official Hosted Online ChromaDB)
+        chroma_api_key = os.getenv("CHROMA_API_KEY")
+        if chroma_api_key:
+            try:
+                tenant = os.getenv("CHROMA_TENANT") or "default_tenant"
+                database = os.getenv("CHROMA_DATABASE") or "default_database"
+                print(f"[RAG] Connecting to Online Chroma Cloud (database='{database}', tenant='{tenant}')...")
+                self.client = chromadb.CloudClient(
+                    api_key=chroma_api_key,
+                    tenant=tenant,
+                    database=database,
+                    settings=Settings(anonymized_telemetry=False)
+                )
+                self.mode = "chroma_cloud"
+                print(f"[RAG] Successfully connected to Online Chroma Cloud (database='{database}')!")
+                return
+            except Exception as e:
+                print(f"[RAG] Chroma Cloud connection failed ({e}). Falling back to next provider...")
+
+        # 2. Remote Hosted ChromaDB Instance (HttpClient)
+        chroma_host = os.getenv("CHROMA_HOST") or os.getenv("CHROMA_SERVER_HOST")
+        if chroma_host:
+            try:
+                host_str = chroma_host.strip()
+                ssl = os.getenv("CHROMA_SSL", "false").lower() in ("true", "1", "yes")
+                if host_str.startswith("https://"):
+                    host_str = host_str.replace("https://", "").rstrip("/")
+                    ssl = True
+                elif host_str.startswith("http://"):
+                    host_str = host_str.replace("http://", "").rstrip("/")
+
+                if ":" in host_str:
+                    host_part, port_part = host_str.split(":", 1)
+                    host = host_part
+                    port = int(port_part)
+                else:
+                    port = int(os.getenv("CHROMA_PORT", "443" if ssl else "8000"))
+
+                headers = None
+                token = os.getenv("CHROMA_AUTH_TOKEN") or os.getenv("CHROMA_TOKEN")
+                if token:
+                    headers = {"Authorization": f"Bearer {token}"}
+
+                tenant = os.getenv("CHROMA_TENANT", "default_tenant")
+                database = os.getenv("CHROMA_DATABASE", "default_database")
+
+                print(f"[RAG] Connecting to Online ChromaDB server at {host}:{port} (ssl={ssl})...")
+                self.client = chromadb.HttpClient(
+                    host=host,
+                    port=port,
+                    ssl=ssl,
+                    headers=headers,
+                    tenant=tenant,
+                    database=database,
+                    settings=Settings(anonymized_telemetry=False)
+                )
+                self.client.heartbeat()
+                self.mode = "remote_http"
+                print(f"[RAG] Successfully connected to Online ChromaDB server at {host}:{port}!")
+                return
+            except Exception as e:
+                print(f"[RAG] Online Chroma server connection failed ({e}). Falling back to local store...")
+
+        # 3. Local Persistent ChromaDB
         os.makedirs(self.persist_dir, exist_ok=True)
         self.client = chromadb.PersistentClient(
             path=self.persist_dir,
             settings=Settings(anonymized_telemetry=False)
         )
-        self.collection = self.client.get_or_create_collection(name=COLLECTION_NAME)
-        self._ensure_knowledge_seeded()
+        self.mode = "local"
+        print(f"[RAG] Using Local Persistent ChromaDB at {self.persist_dir}")
 
     def _ensure_knowledge_seeded(self):
         """Seed the knowledge base if empty."""
         try:
             count = self.collection.count()
             if count == 0:
-                print(f"[RAG] Seeding ChromaDB collection '{COLLECTION_NAME}' with initial ocean knowledge...")
+                print(f"[RAG] Seeding ChromaDB collection '{COLLECTION_NAME}' [{self.mode}] with ocean knowledge corpus...")
                 docs = [item["text"] for item in OCEAN_KNOWLEDGE_DOCUMENTS]
                 ids = [item["id"] for item in OCEAN_KNOWLEDGE_DOCUMENTS]
                 metadatas = [{"title": item["title"], "category": item["category"]} for item in OCEAN_KNOWLEDGE_DOCUMENTS]
@@ -102,11 +194,12 @@ class ArgoRAGStore:
                     ids=ids,
                     metadatas=metadatas
                 )
-                print(f"[RAG] Successfully seeded {len(ids)} documents into ChromaDB.")
+                print(f"[RAG] Successfully seeded {len(ids)} documents into ChromaDB [{self.mode}].")
             else:
-                print(f"[RAG] ChromaDB collection '{COLLECTION_NAME}' already contains {count} documents.")
+                print(f"[RAG] ChromaDB collection '{COLLECTION_NAME}' [{self.mode}] already contains {count} documents (seeding skipped).")
         except Exception as e:
             print(f"[RAG] Note during ChromaDB seeding: {e}")
+
 
     def query(self, query_text: str, n_results: int = 3) -> List[Dict[str, Any]]:
         """
