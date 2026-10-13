@@ -78,9 +78,13 @@ def call_openrouter_chat(messages, max_tokens=None, temperature=None) -> dict:
         raise RuntimeError(f"OpenRouter API error ({response.status_code}): {error_msg}")
 
     res_json = response.json()
+    if "error" in res_json:
+        err_detail = res_json["error"].get("message", str(res_json["error"]))
+        raise RuntimeError(f"OpenRouter upstream error: {err_detail}")
+
     choices = res_json.get("choices")
     if not choices or len(choices) == 0:
-        raise RuntimeError(f"OpenRouter returned empty response: {res_json}")
+        raise RuntimeError("OpenRouter returned empty response")
 
     return choices[0]["message"]
 

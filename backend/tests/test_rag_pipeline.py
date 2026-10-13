@@ -1,5 +1,9 @@
+import os
 import sys
 import json
+
+# Ensure backend root is on sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 print("=== 1. Testing NLP Parser ===")
 from app.nlp.parser import parse_ocean_query_nlp, get_region_bbox

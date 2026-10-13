@@ -16,7 +16,15 @@ import {
   TrendingDown,
   Navigation,
   Activity,
-  CheckCircle2
+  CheckCircle2,
+  GitCommit,
+  GitBranch,
+  Code2,
+  Cpu,
+  History,
+  FolderTree,
+  Zap,
+  Tag
 } from "lucide-react";
 import { WhaleIcon } from "@/components/WhaleIcon";
 import argoCycleGif from "@/assets/argo-float-cycle.gif";
@@ -29,6 +37,7 @@ interface HeroProps {
 
 export const Hero = ({ onSectionChange }: HeroProps) => {
   const [activeMediaTab, setActiveMediaTab] = useState<"cycle" | "global">("cycle");
+  const [activeUpdateCategory, setActiveUpdateCategory] = useState<"all" | "architecture" | "ai" | "ui" | "telemetry">("all");
 
   const features = [
     {
@@ -440,41 +449,207 @@ export const Hero = ({ onSectionChange }: HeroProps) => {
         </div>
       </section>
 
-      {/* 4. CLEAN FEATURES GRID */}
+      {/* 4. RECENT CODEBASE UPDATES & CHANGELOG TAB */}
       <section className="py-14 md:py-20 bg-muted/20 border-b border-border/60">
         <div className="container mx-auto px-4 max-w-6xl">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">
-              Democratizing Ocean Science
-            </h2>
-            <p className="text-sm sm:text-base text-muted-foreground max-w-xl mx-auto">
-              Bridging complex oceanographic NetCDF datasets and meaningful insights through natural language AI.
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
-            {features.map((feature, index) => {
-              const Icon = feature.icon;
-              return (
-                <Card 
-                  key={index} 
-                  className="p-5 border-border/80 bg-card hover:border-primary/40 hover:shadow-md transition-all rounded-xl flex flex-col justify-between"
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold text-primary mb-3">
+                <GitCommit className="w-3.5 h-3.5" />
+                Live Engineering Changelog
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                Recent Codebase Updates
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1.5 max-w-xl">
+                Verified releases, architectural refactoring, vector memory enhancements, and live telemetry integrations.
+              </p>
+            </div>
+
+            {/* Category Filter Tabs */}
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-background/80 border border-border/80 rounded-xl shadow-xs">
+              {[
+                { id: "all", label: "All Updates", count: "4" },
+                { id: "architecture", label: "Architecture", count: "v2.4" },
+                { id: "ai", label: "LangChain & RAG", count: "v2.3" },
+                { id: "ui", label: "Claude UI", count: "v2.2" },
+                { id: "telemetry", label: "ERDDAP", count: "v2.1" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveUpdateCategory(tab.id as any)}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activeUpdateCategory === tab.id
+                      ? "bg-primary text-primary-foreground shadow-xs font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                  }`}
                 >
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                        <Icon className="w-5 h-5" />
+                  <span>{tab.label}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                    activeUpdateCategory === tab.id
+                      ? "bg-primary-foreground/20 text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Updates Grid */}
+          <div className="grid md:grid-cols-2 gap-5">
+            {[
+              {
+                id: "upd-1",
+                version: "v2.4.0",
+                category: "architecture",
+                date: "Current Release",
+                icon: FolderTree,
+                title: "Modular App Architecture & Codebase Pruning",
+                badge: "Active",
+                badgeColor: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+                description: "Restructured the backend into an industry-standard package hierarchy (app/nlp, app/rag, app/tools, app/agent.py) and removed 1,223 lines of dead code.",
+                highlights: [
+                  "Extracted dedicated packages: app/nlp/parser.py, app/rag/vectorstore.py, and app/tools/",
+                  "Streamlined main.py from 1,037 lines down to 164 lines of modular routing",
+                  "Deleted unused heuristic scrapers, duplicate generators, and legacy root shims",
+                  "Standardized requests payload handling for streaming reasoning traces"
+                ],
+                tags: ["#ModularBackend", "#CleanCode", "#ProductionReady", "#FastBoot"]
+              },
+              {
+                id: "upd-2",
+                version: "v2.3.0",
+                category: "ai",
+                date: "Recent Update",
+                icon: Cpu,
+                title: "ChromaDB Persistent RAG & LangChain Reasoning",
+                badge: "Verified",
+                badgeColor: "bg-cyan-500/10 text-cyan-500 border-cyan-500/20",
+                description: "Implemented persistent vector retrieval using ChromaDB and Pydantic NLP intent recognition for context-augmented oceanographic intelligence.",
+                highlights: [
+                  "ChromaDB persistent collection indexed with 6 verified oceanographic knowledge docs",
+                  "Pydantic NLP query intent parser extracts spatial regions, variables, and float IDs",
+                  "Preserved multi-turn reasoning_details across iterative conversational follow-ups",
+                  "Dynamic tool execution: Folium map generators and Matplotlib CTD depth profiles"
+                ],
+                tags: ["#ChromaDB", "#LangChain", "#RAG", "#OpenRouter", "#Pydantic"]
+              },
+              {
+                id: "upd-3",
+                version: "v2.2.0",
+                category: "ui",
+                date: "Recent Update",
+                icon: WhaleIcon,
+                title: "Claude AI-Inspired Chat & Whale Mascot Avatar",
+                badge: "Enhanced",
+                badgeColor: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+                description: "Overhauled the chat interface to match the balanced Claude AI design system, featuring collapsible sidebars, suggestion pills, and a friendly whale mascot.",
+                highlights: [
+                  "Fixed viewport layout with zero double-scrolling and auto-expanding input box",
+                  "Real-time whale mascot animation with live thinking & responding state badges",
+                  "Rich markdown rendering with mathematical symbols, tables, and expandable reasoning",
+                  "Interactive oceanographic query suggestions for rapid one-click research"
+                ],
+                tags: ["#ClaudeStyle", "#WhaleMascot", "#ResponsiveUI", "#MicroAnimations"]
+              },
+              {
+                id: "upd-4",
+                version: "v2.1.0",
+                category: "telemetry",
+                date: "Recent Update",
+                icon: Radio,
+                title: "Live ERDDAP Sync & Explicit Telemetry Controls",
+                badge: "Live Telemetry",
+                badgeColor: "bg-indigo-500/10 text-indigo-500 border-indigo-500/20",
+                description: "Direct real-time ingestion from NOAA ERDDAP, Coriolis, and INCOIS GDAC feeds with on-demand user refresh controls to eliminate API timeouts.",
+                highlights: [
+                  "Over 3,800 active floats monitored across 8 major global ocean basins",
+                  "Explicit on-demand refresh controls replace aggressive background polling",
+                  "Interactive 3D Earth Globe with coordinate pinpointing and status filters",
+                  "Full vertical CTD depth profiling (0m–6,000m) with live gradient calculations"
+                ],
+                tags: ["#NOAA", "#ERDDAP", "#LiveTelemetry", "#3DGlobe", "#CTDProfiles"]
+              }
+            ]
+              .filter(u => activeUpdateCategory === "all" || u.category === activeUpdateCategory)
+              .map((update) => {
+                const IconComponent = update.icon;
+                return (
+                  <Card 
+                    key={update.id} 
+                    className="p-5 sm:p-6 border-border/80 bg-card hover:border-primary/40 hover:shadow-md transition-all rounded-2xl flex flex-col justify-between"
+                  >
+                    <div>
+                      {/* Top Meta Header */}
+                      <div className="flex items-center justify-between mb-3.5">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                            <IconComponent className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="text-xs font-bold text-foreground font-mono">{update.version}</span>
+                            <span className="text-[11px] text-muted-foreground ml-2">• {update.date}</span>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className={`text-[10px] px-2 py-0.5 border ${update.badgeColor}`}>
+                          {update.badge}
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className="text-[10px] font-normal px-2 py-0.5">
-                        {feature.badge}
-                      </Badge>
+
+                      {/* Title & Description */}
+                      <h3 className="text-base font-semibold mb-2 text-foreground">{update.title}</h3>
+                      <p className="text-xs text-muted-foreground leading-relaxed mb-4">{update.description}</p>
+
+                      {/* Detailed Highlights */}
+                      <div className="space-y-2 mb-4 bg-muted/30 p-3 rounded-xl border border-border/40">
+                        <div className="text-[11px] font-semibold text-foreground/80 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                          <Zap className="w-3 h-3 text-primary" /> Key Improvements
+                        </div>
+                        {update.highlights.map((item, idx) => (
+                          <div key={idx} className="flex items-start gap-2 text-xs text-muted-foreground">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" />
+                            <span className="leading-snug">{item}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <h3 className="text-sm font-semibold mb-1.5 text-foreground">{feature.title}</h3>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{feature.description}</p>
-                  </div>
-                </Card>
-              );
-            })}
+
+                    {/* Tags Footer */}
+                    <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border/50">
+                      {update.tags.map((tag, tIdx) => (
+                        <span 
+                          key={tIdx} 
+                          className="text-[10px] font-mono px-2 py-0.5 bg-muted/60 text-muted-foreground rounded-md border border-border/40"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </Card>
+                );
+              })}
+          </div>
+
+          {/* Quick Architecture Summary Banner */}
+          <div className="mt-8 p-4 rounded-xl border border-border/80 bg-card/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="font-semibold text-foreground">Active Architecture:</span>
+              <span className="text-muted-foreground font-mono">Flask 3.x + LangChain + ChromaDB (Local Persisted) + OpenRouter + Vite React</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => onSectionChange("chat")}
+                className="text-xs h-8 rounded-lg gap-1.5"
+              >
+                <WhaleIcon className="w-3.5 h-3.5 text-primary" />
+                <span>Test in Whale Chat</span>
+              </Button>
+            </div>
           </div>
         </div>
       </section>
