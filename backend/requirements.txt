@@ -20,3 +20,5 @@ langchain-community
 langchain-openai
 chromadb
 pydantic
+gunicorn
+
