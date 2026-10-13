@@ -74,7 +74,7 @@ flowchart TB
     subgraph ExternalServices["External Providers & Data Sources"]
         OpenRouter["OpenRouter LLM (Nvidia Nemotron 550B with Reasoning)"]
         ERDDAP_API["NOAA ERDDAP & Coriolis GDAC Telemetry"]
-        LocalChroma["Persistent ChromaDB Store (SQLite3 + Vector Index)"]
+        ChromaCloud["Chroma Cloud (api.trychroma.com) / Local Persistent Store"]
     end
 
     UI_Chat -->|"User Query + History"| EP_Chat
@@ -94,7 +94,7 @@ flowchart TB
     AgentLayer --> Tool_Chart
     AgentLayer --> Tool_Map
 
-    RAG_Module <-->|"Embeddings & Docs"| LocalChroma
+    RAG_Module <-->|"Embeddings & Docs"| ChromaCloud
     Data_Module <-->|"tabledap Ingestion"| ERDDAP_API
     AgentLayer <-->|"Reasoning Traces & Messages"| OpenRouter
 ```
@@ -239,14 +239,18 @@ backend/
 
 ---
 
-#### `app/rag/vectorstore.py` - ChromaDB Persistent Vector Store
-- **Role:** Provides low-latency, persistent retrieval of verified oceanographic domain knowledge.
-- **Persistence Path:** Stores vector embeddings locally in `chroma_db/` (`chromadb.PersistentClient`).
+#### `app/rag/vectorstore.py` - ChromaDB Cloud & Persistent Vector Store
+- **Role:** Provides low-latency, persistent retrieval of verified oceanographic domain knowledge for RAG prompt augmentation.
+- **Multi-Tier Connection Hierarchy:**
+  1. **Chroma Cloud (`chromadb.CloudClient`):** Automatically activated when `CHROMA_API_KEY`, `CHROMA_TENANT`, and `CHROMA_DATABASE` are provided. Connects over secure HTTPS to Chroma's managed cloud infrastructure (`api.trychroma.com`).
+  2. **Remote Hosted Server (`chromadb.HttpClient`):** Connects to any remote ChromaDB Docker instance via `CHROMA_HOST`, `CHROMA_PORT`, and `CHROMA_SSL`.
+  3. **Local Persistent Fallback (`chromadb.PersistentClient`):** Runs embedded on local disk in `chroma_db/` without requiring external services.
+- **Seeding & Diagnostics (`seed_chroma.py`):** Standalone CLI utility (`python backend/seed_chroma.py`) that checks connection mode, counts indexed documents, and verifies semantic search accuracy.
 - **Core Knowledge Corpus (`argo_ocean_knowledge`):**
   - **`argo_cycle_mechanics`**: Explains the 9–10 day autonomous operational profiling cycle (deployment, neutral drift at 1,000m, descent to 2,000m, ascent profiling, satellite telemetry).
   - **`ocean_temperature_thermocline`**: Mixed surface layer physics, permanent thermocline, deep abyssal water layer, and Ocean Heat Content (OHC).
   - **`ocean_salinity_halocline`**: Practical Salinity Units (PSU), halocline dynamics, density stratifications, and global thermohaline circulation.
-  - **`ocean_currents_circulation`**: Wind-driven subtropical gyres, Western Boundary Currents (Gulf Stream, Kuroshio), and Southern Ocean Antarctic Circumpolar Current (ACC).
+  - **`major_ocean_currents`**: Wind-driven subtropical gyres, Western Boundary Currents (Gulf Stream, Kuroshio), and Southern Ocean Antarctic Circumpolar Current (ACC).
   - **`bgc_argo_biogeochemical`**: Biogeochemical optical sensors: Dissolved Oxygen (DO optodes), Nitrate (NO3-), pH (ISFET), Chlorophyll-a, and particulate backscattering.
   - **`argo_data_system_erddap`**: Global Data Assembly Centers (GDACs: Coriolis, US GODAE), tabledap protocols, and Quality Control (QC) flags.
 - **Hybrid Retrieval (`query` & `format_context_for_prompt`):** Queries vector embeddings with automatic fallback to semantic lexical scoring if initialization is underway.
@@ -494,10 +498,24 @@ pip install -r requirements.txt
 #### Configure Environment Variables (`backend/.env`):
 Create a `.env` file in the `backend/` folder:
 ```env
+# OpenRouter LLM Configuration
 OPENROUTER_API_KEY=your_actual_openrouter_api_key_here
 OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
+
+# Server Port
 PORT=5000
+
+# Chroma Cloud Vector Database (https://cloud.trychroma.com)
+CHROMA_API_KEY=your_chroma_cloud_api_key_here
+CHROMA_TENANT=your_tenant_id_here
+CHROMA_DATABASE=ARGO_AIbot
 ```
+
+#### Seed & Verify Chroma Cloud:
+```bash
+python seed_chroma.py
+```
+*Verifies database authentication and seeds the 6 oceanographic knowledge documents.*
 
 #### Launch Backend Server:
 ```bash
@@ -519,6 +537,47 @@ npm install
 npm run dev
 ```
 *The React frontend will be accessible at `http://localhost:8080/` (or `http://localhost:5173/`).*
+
+---
+
+## ☁️ Production Cloud Deployment (Render & Vercel)
+
+### Option 1: Backend on Render (PaaS Web Service)
+1. Log in to [Render](https://dashboard.render.com) and click **New → Web Service**.
+2. Connect your GitHub repository (`AnishSonar1234/ARGO-AI`).
+3. Set the following build configuration:
+   - **Root Directory:** `backend`
+   - **Environment:** `Python 3` (or `Docker`)
+   - **Build Command:** `pip install -r requirements.txt`
+   - **Start Command:** `gunicorn main:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120`
+4. Add the following **Environment Variables**:
+   - `OPENROUTER_API_KEY` = your OpenRouter key
+   - `OPENROUTER_MODEL` = `nvidia/nemotron-3-ultra-550b-a55b:free`
+   - `CHROMA_API_KEY` = `ck-BCJCD4oc6SyzQDgKeNTdyhV6Jr6AaYT71R6mj3kt5daT`
+   - `CHROMA_TENANT` = `61667dc0-fc51-4592-944f-ca541b2b7a59`
+   - `CHROMA_DATABASE` = `ARGO_AIbot`
+5. Click **Deploy Web Service**. Once live, note your backend URL (e.g. `https://argo-ai-backend.onrender.com`).
+
+### Option 2: Frontend on Vercel
+1. Log in to [Vercel](https://vercel.com) and click **Add New → Project**.
+2. Import the `ARGO-AI` repository.
+3. In Project Settings:
+   - **Root Directory:** `frontend`
+   - **Framework Preset:** `Vite`
+4. Add the **Environment Variable**:
+   - `VITE_BACKEND_URL` = `https://<your-render-backend-url>/chat`
+5. Click **Deploy**. Your full-stack cloud application is live worldwide.
+
+---
+
+### Option 3: Full-Stack Docker Compose (Self-Hosted)
+To run the complete system locally or on an Ubuntu/Debian cloud server with Docker:
+```bash
+docker compose up --build -d
+```
+- Frontend UI: `http://localhost:80`
+- Backend API: `http://localhost:5000`
+- ChromaDB: `http://localhost:8000`
 
 ---
 

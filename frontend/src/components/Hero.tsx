@@ -469,9 +469,9 @@ export const Hero = ({ onSectionChange }: HeroProps) => {
             {/* Category Filter Tabs */}
             <div className="flex flex-wrap items-center gap-1.5 p-1 bg-background/80 border border-border/80 rounded-xl shadow-xs">
               {[
-                { id: "all", label: "All Updates", count: "4" },
+                { id: "all", label: "All Updates", count: "5" },
                 { id: "architecture", label: "Architecture", count: "v2.4" },
-                { id: "ai", label: "LangChain & RAG", count: "v2.3" },
+                { id: "ai", label: "LangChain & RAG", count: "v2.5" },
                 { id: "ui", label: "Claude UI", count: "v2.2" },
                 { id: "telemetry", label: "ERDDAP", count: "v2.1" },
               ].map((tab) => (
@@ -500,6 +500,24 @@ export const Hero = ({ onSectionChange }: HeroProps) => {
           {/* Updates Grid */}
           <div className="grid md:grid-cols-2 gap-5">
             {[
+              {
+                id: "upd-cloud",
+                version: "v2.5.0",
+                category: "ai",
+                date: "Latest Release",
+                icon: Database,
+                title: "Chroma Cloud Online Vector Store & Cloud PaaS Deployment",
+                badge: "Live Cloud",
+                badgeColor: "bg-cyan-500/10 text-cyan-500 border-cyan-500/20",
+                description: "Connected the platform to official Chroma Cloud (api.trychroma.com) with remote vector storage, automated knowledge seeding, and dynamic port binding for Render/Vercel.",
+                highlights: [
+                  "Integrated chromadb.CloudClient with secure tenant & database authentication",
+                  "Pre-seeded 6 comprehensive oceanographic domain knowledge corpora into Chroma Cloud",
+                  "Added standalone seed_chroma.py diagnostic utility and dynamic $PORT handling in Dockerfile",
+                  "Seamless fallback to local persistent ChromaDB whenever cloud credentials are not supplied"
+                ],
+                tags: ["#ChromaCloud", "#CloudDeployment", "#VectorDatabase", "#RenderPaaS", "#Vercel"]
+              },
               {
                 id: "upd-1",
                 version: "v2.4.0",
