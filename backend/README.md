@@ -1,42 +1,60 @@
-# Backend Setup Instructions
+# 🌊 ARGO-AI Backend Service
 
-## Environment Variables
+The ARGO-AI backend is a lightweight, modular Python service built with **Flask 3.x**, **LangChain**, and **ChromaDB**.
 
-Create a `.env` file in the backend directory with the following content:
+---
+
+## 🏗️ Architecture
 
 ```
-# OpenRouter API Configuration
-# Get your API key from https://openrouter.ai/
-OPENROUTER_API_KEY=your_actual_api_key_here
+backend/
+├── app/
+│   ├── nlp/             # Pydantic Intent Schema & Entity Extractor (parser.py)
+│   ├── rag/             # ChromaDB Vector Store & NOAA ERDDAP Ingestion
+│   ├── tools/           # Matplotlib Chart Engine & Folium Map Engine
+│   └── agent.py         # LangChain Multi-Turn Orchestration Agent
+├── tests/               # Regression and pipeline verification tests
+├── main.py              # 160-line Production REST API Router
+└── requirements.txt     # Pinned Python dependencies
+```
 
-# Server Configuration
+---
+
+## ⚙️ Environment Variables
+
+Create a `.env` file in this directory:
+
+```env
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
 PORT=5000
 ```
 
-## Getting an OpenRouter API Key
+---
 
-1. Go to [https://openrouter.ai/](https://openrouter.ai/)
-2. Sign up for an account
-3. Get your API key from the dashboard
-4. Replace `your_actual_api_key_here` in the `.env` file with your real API key
-
-## Running the Server
+## 🚀 Running the Server
 
 ```bash
-cd backend
+# 1. Activate Virtual Environment
+.\venv\Scripts\activate   # Windows
+source venv/bin/activate  # Linux/macOS
+
+# 2. Start Flask Server
 python main.py
 ```
 
-The server will start on http://localhost:5000
+Server runs on: **`http://localhost:5000`**
 
-## API Endpoints
+---
 
-- `POST /chat` - Chat with the AI assistant
-  - Body: `{"message": "Your question here"}`
-  - Response: `{"reply": "AI response"}`
+## 🧪 Running Automated Tests
 
-## Troubleshooting
+```bash
+# Run End-to-End RAG & NLP Test
+.\venv\Scripts\python.exe tests/test_rag_pipeline.py
 
-- **401 Error**: Invalid API key - check your OpenRouter API key
-- **500 Error**: Server error - check the console for detailed error messages
-- **Connection Error**: Make sure the server is running on port 5000
+# Run Multi-Turn Chat & Reasoning Test
+.\venv\Scripts\python.exe tests/test_chat_endpoint.py
+```
+
+For full system documentation and architectural diagrams, see the root [README.md](../README.md).
