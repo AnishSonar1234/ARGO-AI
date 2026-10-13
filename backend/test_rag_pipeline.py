@@ -2,7 +2,7 @@ import sys
 import json
 
 print("=== 1. Testing NLP Parser ===")
-from nlp_parser import parse_ocean_query_nlp, get_region_bbox
+from app.nlp.parser import parse_ocean_query_nlp, get_region_bbox
 
 test_queries = [
     "Show me a map of where active floats are in the North Atlantic",
@@ -15,7 +15,7 @@ for q in test_queries:
     print(f"Query: '{q}'\n  -> Intent: {parsed.intent}, Region: {parsed.region}, Vars: {parsed.variables}\n")
 
 print("=== 2. Testing ChromaDB RAG Store ===")
-from rag_store import rag_store
+from app.rag.vectorstore import rag_store
 
 print(f"Total documents indexed in ChromaDB: {rag_store.count()}")
 context = rag_store.format_context_for_prompt("What is the profiling cycle of an ARGO float?")

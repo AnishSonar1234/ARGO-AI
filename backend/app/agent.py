@@ -7,6 +7,7 @@ from typing import Dict, Any, List, Optional
 
 from app.nlp.parser import parse_ocean_query_nlp, get_region_bbox, OceanQueryIntent
 from app.rag.vectorstore import rag_store
+from app.rag.erddap_retriever import fetch_argo_float_locations, fetch_real_time_argo_data
 from app.tools.map_tool import create_map
 from app.tools.chart_tool import create_graph
 
@@ -24,15 +25,16 @@ class OceanLangChainAgent:
         user_message: str,
         history: List[Dict[str, Any]],
         call_llm_func,
-        fetch_locations_func,
-        fetch_data_func,
-        # Optional overrides allow main.py to pass custom tools if needed
+        fetch_locations_func=None,
+        fetch_data_func=None,
         create_map_func=None,
         create_graph_func=None,
     ) -> Dict[str, Any]:
         """
         Executes the full NLP -> RAG -> Tool/Data -> LLM Reasoning pipeline.
         """
+        _fetch_locations = fetch_locations_func or fetch_argo_float_locations
+        _fetch_data = fetch_data_func or fetch_real_time_argo_data
         _create_map = create_map_func or create_map
         _create_graph = create_graph_func or create_graph
 
@@ -51,9 +53,9 @@ class OceanLangChainAgent:
         if parsed.intent in ("map_visualization", "graph_analytics") or parsed.region:
             try:
                 if parsed.intent == "map_visualization":
-                    live_df = fetch_locations_func(parsed.region)
+                    live_df = _fetch_locations(parsed.region)
                 else:
-                    live_df = fetch_data_func(parsed.region, days_back=7)
+                    live_df = _fetch_data(parsed.region, days_back=7)
 
                 if live_df is not None and not live_df.empty:
                     sample_rows = min(len(live_df), 10)
@@ -115,7 +117,7 @@ class OceanLangChainAgent:
         if parsed.intent == "map_visualization":
             try:
                 if live_df is None or live_df.empty:
-                    live_df = fetch_locations_func(parsed.region)
+                    live_df = _fetch_locations(parsed.region)
                 map_html = _create_map(user_message, live_df, ai_reply)
                 has_map = True
             except Exception as map_err:
@@ -124,7 +126,7 @@ class OceanLangChainAgent:
         elif parsed.intent == "graph_analytics":
             try:
                 if live_df is None or live_df.empty:
-                    live_df = fetch_data_func(parsed.region, days_back=7)
+                    live_df = _fetch_data(parsed.region, days_back=7)
                 graph_img = _create_graph(user_message, live_df, ai_reply)
                 has_graph = True
             except Exception as graph_err:

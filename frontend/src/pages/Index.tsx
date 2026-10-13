@@ -3,7 +3,6 @@ import { Navbar } from "@/components/Navbar";
 import { Hero } from "@/components/Hero";
 import { ChatInterface } from "@/components/ChatInterface";
 import { Dashboard } from "@/components/Dashboard";
-import { MapView } from "@/components/MapView";
 
 const Index = () => {
   const [activeSection, setActiveSection] = useState("home");
