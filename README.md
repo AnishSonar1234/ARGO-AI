@@ -549,7 +549,7 @@ npm run dev
    - **Root Directory:** `backend`
    - **Environment:** `Python 3` (or `Docker`)
    - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** `gunicorn main:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120`
+   - **Start Command:** `python main.py`
 4. Add the following **Environment Variables**:
    - `OPENROUTER_API_KEY` = your OpenRouter key
    - `OPENROUTER_MODEL` = `nvidia/nemotron-3-ultra-550b-a55b:free`

@@ -17,4 +17,4 @@ EXPOSE 5000
 ENV PORT=5000
 ENV PYTHONUNBUFFERED=1
 
-CMD ["sh", "-c", "gunicorn main:app --bind 0.0.0.0:${PORT:-5000} --workers 2 --timeout 120"]
+CMD ["python", "main.py"]
