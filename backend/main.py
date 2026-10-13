@@ -17,8 +17,8 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import requests
 from datetime import datetime, timedelta
-from ocean_agent import ocean_agent
-from rag_store import rag_store
+from app.agent import ocean_agent
+from app.rag.vectorstore import rag_store
 
 # Load environment variables from .env file
 load_dotenv()
@@ -967,15 +967,16 @@ def chat():
         if not user_message:
             return jsonify({"error": "message is required"}), 400
 
-        # Execute LangChain + ChromaDB RAG + NLP Agent
+        # Execute LangChain + ChromaDB RAG + NLP Agent pipeline
         result = ocean_agent.process_query(
             user_message=user_message,
             history=history,
             call_llm_func=call_openrouter_chat,
+            fetch_locations_func=fetch_argo_float_locations,
+            fetch_data_func=fetch_real_time_argo_data,
+            # Optional: pass main.py's local implementations as overrides
             create_map_func=create_map,
             create_graph_func=create_graph,
-            fetch_locations_func=fetch_argo_float_locations,
-            fetch_data_func=fetch_real_time_argo_data
         )
 
         return jsonify(result)
