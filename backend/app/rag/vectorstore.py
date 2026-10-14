@@ -73,6 +73,51 @@ NOAA ERDDAP provides access to ARGO observations via the tabledap protocol:
 - Server URL: https://polarwatch.noaa.gov/erddap/tabledap/argoFloats.json
 - Standard query variables: time (ISO-8601), latitude, longitude, depth (or pres in dbar), temperature (temp in degC), salinity (psal in PSU), platform_number (WMO ID).
 - Quality Control (QC): Real-time quality control flags 1 (good data), 2 (probably good), 3 (probably bad), 4 (bad data)."""
+    },
+    {
+        "id": "argo_time_series_dynamics",
+        "title": "ARGO Time Series Dynamics & Temporal Ocean Observations",
+        "category": "time_series",
+        "text": """ARGO floats continuously record time-series observations as they drift over months and years:
+1. Operational Time Series: Each float performs a sounding cycle every 9-10 days, generating a longitudinal time series of 150 to 250+ cycles across its 4-5 year design lifespan.
+2. Temporal Dynamics Observed:
+   - Steric Sea Level Rise: Thermal expansion and halosteric changes tracked over multi-year time series.
+   - Marine Heatwaves (MHWs): Multi-week sustained sea surface and subsurface temperature anomalies exceeding the 90th climatological percentile.
+   - Climate Oscillations: Multi-month time-series detect El Niño Southern Oscillation (ENSO), Indian Ocean Dipole (IOD), and North Atlantic Oscillation (NAO) transitions.
+   - Subsurface Preconditioning: Heat accumulation in the upper 300m observed weeks before cyclone intensification."""
+    },
+    {
+        "id": "argo_monthly_averages_climatology",
+        "title": "ARGO Monthly Climatological Averages & Annual Cycles",
+        "category": "monthly_climatology",
+        "text": """Monthly oceanographic averages provide the baseline seasonal cycle across all 12 calendar months:
+1. Sea Surface Temperature (SST) Annual Cycle: Tropical basins (Arabian Sea, Bay of Bengal) display a bimodal warming cycle with peaks in May (pre-monsoon ~30°C) and October, with summer monsoon upwelling cooling in July-August (~26.5°C). Subtropical and temperate basins exhibit a single summer peak (August in Northern Hemisphere, February in Southern Hemisphere).
+2. Salinity Seasonal Fluctuations: Driven by seasonal monsoon precipitation and river runoff (e.g., severe Ganges-Brahmaputra freshening in the Bay of Bengal from August to October where surface salinity drops below 32 PSU).
+3. Mixed Layer Depth (MLD) Seasonality: MLD shoals to 15-30m during calm, high-insolation summer months and deepens to 100-250m during winter convective overturning and strong wind-driven shear mixing."""
+    },
+    {
+        "id": "argo_gridded_climatology_products",
+        "title": "Gridded Ocean Climatology (RG-Argo, WOA, ISAS)",
+        "category": "gridded_climatology",
+        "text": """Gridded climatology products synthesize millions of autonomous ARGO soundings into regularized 3D ocean fields:
+1. Roemmich-Gilson Argo Climatology (RG-Argo): 1°x1° horizontal resolution objective mapping covering 65°S to 65°N across 58 standard pressure/depth levels from surface to 2,000 dbar.
+2. World Ocean Atlas (WOA23 / NOAA NCEI): Climatological mean fields of in-situ temperature, practical salinity, and dissolved oxygen at standard oceanographic horizons (0, 10, 20, 50, 100, 150, 200, 300, 400, 500, 750, 1000, 1500, 2000m).
+3. Water Mass Horizons: Gridded climatology maps the core locations of Subtropical Underwater (STUW, salinity maximum at 100-200m), Antarctic Intermediate Water (AAIW, salinity minimum ~34.5 PSU at 700-1000m), and North Atlantic Deep Water (NADW, 1500-3000m)."""
+    },
+    {
+        "id": "argo_full_vertical_profile_ctd",
+        "title": "Full Vertical CTD Water Column Stratification",
+        "category": "vertical_profile",
+        "text": """Full vertical CTD soundings from surface (0m) to bathypelagic depths (2,000m Core / 6,000m Deep ARGO) resolve the complete ocean stratification:
+1. Epipelagic Zone (0-200m):
+   - Mixed Surface Layer (MLD): Defined by a temperature threshold of ΔT = 0.2°C from 10m depth, or density threshold Δσ_θ = 0.03 kg/m³.
+   - Barrier Layer: Formed when the isothermal layer is deeper than the isopycnal layer due to low-salinity capping.
+2. Mesopelagic Zone (200-1,000m):
+   - Permanent Thermocline: Zone of maximum vertical temperature gradient (-dT/dz).
+   - Halocline & Pycnocline: Maximum density gradient ensuring gravitational stability, with peak Brunt-Väisälä buoyancy frequency N² ~ 10⁻⁴ s⁻².
+   - Oxygen Minimum Zone (OMZ): Severe deoxygenation (~20-60 µmol/kg) between 300m and 700m due to organic matter respiration.
+3. Bathypelagic & Abyssal Zones (1,000-6,000m):
+   - Stable cold water (0.5°C to 2.5°C), near-constant salinity (34.68 to 34.88 PSU), and high dissolved oxygen recharge from deep polar overturning."""
     }
 ]
 
@@ -181,24 +226,29 @@ class ArgoRAGStore:
         print(f"[RAG] Using Local Persistent ChromaDB at {self.persist_dir}")
 
     def _ensure_knowledge_seeded(self):
-        """Seed the knowledge base if empty."""
+        """Seed or update the knowledge base with the full oceanographic corpus."""
         try:
-            count = self.collection.count()
-            if count == 0:
-                print(f"[RAG] Seeding ChromaDB collection '{COLLECTION_NAME}' [{self.mode}] with ocean knowledge corpus...")
-                docs = [item["text"] for item in OCEAN_KNOWLEDGE_DOCUMENTS]
-                ids = [item["id"] for item in OCEAN_KNOWLEDGE_DOCUMENTS]
-                metadatas = [{"title": item["title"], "category": item["category"]} for item in OCEAN_KNOWLEDGE_DOCUMENTS]
+            docs = [item["text"] for item in OCEAN_KNOWLEDGE_DOCUMENTS]
+            ids = [item["id"] for item in OCEAN_KNOWLEDGE_DOCUMENTS]
+            metadatas = [{"title": item["title"], "category": item["category"]} for item in OCEAN_KNOWLEDGE_DOCUMENTS]
+            
+            # Use upsert so existing documents are preserved/updated and new documents are added
+            if hasattr(self.collection, "upsert"):
+                self.collection.upsert(
+                    documents=docs,
+                    ids=ids,
+                    metadatas=metadatas
+                )
+            else:
                 self.collection.add(
                     documents=docs,
                     ids=ids,
                     metadatas=metadatas
                 )
-                print(f"[RAG] Successfully seeded {len(ids)} documents into ChromaDB [{self.mode}].")
-            else:
-                print(f"[RAG] ChromaDB collection '{COLLECTION_NAME}' [{self.mode}] already contains {count} documents (seeding skipped).")
+            print(f"[RAG] Successfully synchronized {len(ids)} oceanographic documents into ChromaDB [{self.mode}].")
         except Exception as e:
             print(f"[RAG] Note during ChromaDB seeding: {e}")
+
 
 
     def query(self, query_text: str, n_results: int = 3) -> List[Dict[str, Any]]:

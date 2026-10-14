@@ -7,6 +7,16 @@ class OceanQueryIntent(BaseModel):
         default="general_qa",
         description="The primary visualization or answer intent of the user."
     )
+    data_type: Literal[
+        "time_series", 
+        "monthly_averages", 
+        "gridded_climatology", 
+        "vertical_profile", 
+        "current_observations"
+    ] = Field(
+        default="current_observations",
+        description="The specific oceanographic data modality (time series, monthly averages, gridded climatology, vertical profile, or current observations)."
+    )
     region: Optional[str] = Field(
         default=None,
         description="The geographic ocean region (e.g. Pacific, North Atlantic, Indian Ocean, Arctic, Southern Ocean)."
@@ -48,11 +58,49 @@ OCEAN_REGIONS_BBOX = {
 def parse_ocean_query_nlp(query: str) -> OceanQueryIntent:
     """
     NLP Intent & Entity Parser for Oceanographic Queries.
-    Combines rule-based semantic analysis with named-entity extraction.
+    Extracts visualization intent, data modality (time series, monthly averages, gridded climatology, vertical profile),
+    geographic regions, depth scopes, and float platform IDs.
     """
     text = query.lower().strip()
     
-    # 1. Intent Detection
+    # 1. Modality / Data Type Detection
+    data_type: Literal[
+        "time_series", "monthly_averages", "gridded_climatology", "vertical_profile", "current_observations"
+    ] = "current_observations"
+
+    time_series_triggers = [
+        "time series", "timeseries", "over time", "temporal", "trend", "past 30", "past 60", "past 90",
+        "past days", "drift history", "progression", "cycle by cycle", "cycle to cycle", "time-series",
+        "day by day", "over days", "over months", "drift over"
+    ]
+    monthly_triggers = [
+        "monthly average", "monthly averages", "monthly mean", "by month", "each month", "month by month",
+        "month-by-month", "seasonal cycle", "annual cycle", "seasonal variation", "monthly variation",
+        "monthly climatology", "seasonal climatology", "january", "february", "march", "april",
+        "may", "june", "july", "august", "september", "october", "november", "december"
+    ]
+    gridded_triggers = [
+        "gridded", "climatology", "rg-argo", "woa", "world ocean atlas", "gridded climatology",
+        "gridded data", "objective analysis", "basin climatology", "isas", "standard depths",
+        "standard levels", "grid", "gridded field"
+    ]
+    vertical_triggers = [
+        "vertical profile", "full profile", "full vertical profile", "vertical profiles",
+        "water column", "ctd profile", "depth profile", "temperature vs depth", "salinity vs depth",
+        "thermocline", "halocline", "pycnocline", "0 to 2000", "0-2000", "surface to depth",
+        "water column profile", "sound speed profile", "mld", "mixed layer depth"
+    ]
+
+    if any(t in text for t in monthly_triggers):
+        data_type = "monthly_averages"
+    elif any(t in text for t in time_series_triggers):
+        data_type = "time_series"
+    elif any(t in text for t in gridded_triggers):
+        data_type = "gridded_climatology"
+    elif any(t in text for t in vertical_triggers):
+        data_type = "vertical_profile"
+
+    # 2. Intent Detection
     intent: Literal["graph_analytics", "map_visualization", "general_qa"] = "general_qa"
     
     map_triggers = [
@@ -62,25 +110,26 @@ def parse_ocean_query_nlp(query: str) -> OceanQueryIntent:
     graph_triggers = [
         "graph", "plot", "chart", "profile", "depth profile", "temperature vs", 
         "salinity vs", "trend", "histogram", "time series", "bathymetry chart", 
-        "correlation", "visualize temperature", "visualize salinity"
+        "correlation", "visualize temperature", "visualize salinity", "show data",
+        "give data", "data table", "curves"
     ]
     
     has_map = any(trigger in text for trigger in map_triggers)
-    has_graph = any(trigger in text for trigger in graph_triggers)
+    has_graph = any(trigger in text for trigger in graph_triggers) or data_type in ("time_series", "monthly_averages", "gridded_climatology", "vertical_profile")
     
     if has_graph and not (has_map and ("where" in text or "location" in text)):
         intent = "graph_analytics"
     elif has_map:
         intent = "map_visualization"
     
-    # 2. Region Extraction
+    # 3. Region Extraction
     detected_region = None
     for region_name in OCEAN_REGIONS_BBOX.keys():
         if region_name in text:
             detected_region = region_name.title()
             break
             
-    # 3. Variable Extraction
+    # 4. Variable Extraction
     vars_found = []
     if "temp" in text or "temperature" in text or "heat" in text or "thermal" in text:
         vars_found.append("temperature")
@@ -90,8 +139,10 @@ def parse_ocean_query_nlp(query: str) -> OceanQueryIntent:
         vars_found.append("depth")
     if "oxygen" in text or "do" in text or "bgc" in text:
         vars_found.append("oxygen")
+    if "density" in text or "pycnocline" in text or "sigma" in text:
+        vars_found.append("density")
         
-    # 4. Depth Extraction (e.g. 2000m or 0-1000m)
+    # 5. Depth Extraction (e.g. 2000m or 0-1000m)
     depth_match = re.search(r'(\d+)\s*(?:-|to)\s*(\d+)\s*(?:m|meter|meters|dbar)', text)
     depth_range = None
     if depth_match:
@@ -101,17 +152,19 @@ def parse_ocean_query_nlp(query: str) -> OceanQueryIntent:
         if single_depth:
             depth_range = [0.0, float(single_depth.group(1))]
 
-    # 5. Float ID extraction (e.g. float 6902745 or WMO 5903421)
+    # 6. Float ID extraction (e.g. float 6902745 or WMO 5903421)
     float_match = re.search(r'(?:float|wmo|platform)\s*(?:#|no|id)?\s*(\d{5,7})', text)
     float_id = float_match.group(1) if float_match else None
 
     return OceanQueryIntent(
         intent=intent,
+        data_type=data_type,
         region=detected_region,
         variables=vars_found,
         depth_range=depth_range,
         float_id=float_id
     )
+
 
 
 def get_region_bbox(region_name: Optional[str]) -> Optional[Dict[str, float]]:

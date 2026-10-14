@@ -51,6 +51,8 @@ export interface Message {
   hasMap?: boolean;
   mapHtml?: string;
   reasoningDetails?: any;
+  dataType?: "time_series" | "monthly_averages" | "gridded_climatology" | "vertical_profile" | "current_observations";
+  dataSummary?: string;
 }
 
 export interface ChatSession {
@@ -66,28 +68,28 @@ const STORAGE_KEY_ACTIVE_ID = "argo_ai_active_session_id_v3";
 
 const INITIAL_SUGGESTIONS = [
   {
-    icon: BarChart2,
-    title: "Temperature vs Depth",
-    subtitle: "Pacific Ocean Bathymetry",
-    prompt: "Show me a graph of temperature vs depth in the Pacific Ocean"
+    icon: Activity,
+    title: "Time Series Data",
+    subtitle: "Multi-Cycle Temporal Drift & SST Trends",
+    prompt: "Provide time series data and temporal evolution for the Arabian Sea"
   },
   {
-    icon: MapPin,
-    title: "Float Coordinates",
-    subtitle: "North Atlantic Ingestion",
-    prompt: "Where are active ARGO floats located right now in the North Atlantic?"
-  },
-  {
-    icon: Compass,
-    title: "Salinity Distribution",
-    subtitle: "Water Column Halocline",
-    prompt: "Plot salinity distribution across depths and explain the halocline"
+    icon: RotateCcw,
+    title: "Monthly Averages",
+    subtitle: "12-Month Climatology & Seasonal Cycle",
+    prompt: "Show me monthly averages of temperature, salinity, and mixed layer depth for the Bay of Bengal"
   },
   {
     icon: Globe2,
-    title: "Southern Ocean Drift",
-    subtitle: "Antarctic Circumpolar Flow",
-    prompt: "What are the latest ARGO float observations in the Southern Ocean?"
+    title: "Gridded Climatology",
+    subtitle: "WOA / RG-Argo Standard Horizons (0-2000m)",
+    prompt: "Provide gridded climatology data across standard depth horizons in the North Atlantic"
+  },
+  {
+    icon: Waves,
+    title: "Full Vertical Profiles",
+    subtitle: "High-Res CTD Stratification (0-2000m)",
+    prompt: "Generate a full vertical profile for float 2903334 down to 2000m with stratification analysis"
   }
 ];
 
@@ -483,7 +485,9 @@ export const ChatInterface = ({ isActive = true }: ChatInterfaceProps = {}) => {
         graphImage: data?.graph || undefined,
         hasMap: data?.has_map || false,
         mapHtml: data?.map || undefined,
-        reasoningDetails: data?.reasoning_details
+        reasoningDetails: data?.reasoning_details,
+        dataType: data?.data_type,
+        dataSummary: data?.data_summary
       };
 
       setServerStatus("connected");
@@ -829,13 +833,33 @@ export const ChatInterface = ({ isActive = true }: ChatInterfaceProps = {}) => {
                         <WhaleIcon className="w-4.5 h-4.5 text-white" />
                       </div>
                       <div className="flex-1 min-w-0 space-y-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-xs text-foreground flex items-center gap-1.5">
                             <span>ARGO Whale</span>
                             <Badge variant="outline" className="text-[9px] py-0 px-1 border-primary/30 text-primary">
                               AI Oceanographer
                             </Badge>
                           </span>
+                          {message.dataType === "time_series" && (
+                            <Badge variant="secondary" className="text-[9px] py-0 px-1.5 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+                              📈 Time Series Data
+                            </Badge>
+                          )}
+                          {message.dataType === "monthly_averages" && (
+                            <Badge variant="secondary" className="text-[9px] py-0 px-1.5 bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                              🗓️ 12-Month Climatology
+                            </Badge>
+                          )}
+                          {message.dataType === "gridded_climatology" && (
+                            <Badge variant="secondary" className="text-[9px] py-0 px-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                              🌐 Gridded Climatology (WOA / RG-Argo)
+                            </Badge>
+                          )}
+                          {message.dataType === "vertical_profile" && (
+                            <Badge variant="secondary" className="text-[9px] py-0 px-1.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
+                              🔬 Full CTD Vertical Profile (0-2000m)
+                            </Badge>
+                          )}
                           <span className="text-[10px] text-muted-foreground">{message.timestamp}</span>
                         </div>
 
@@ -909,7 +933,13 @@ export const ChatInterface = ({ isActive = true }: ChatInterfaceProps = {}) => {
                             <div className="bg-muted/60 px-3 py-2 border-b border-border flex items-center justify-between text-xs">
                               <span className="font-medium flex items-center gap-1.5 text-foreground">
                                 <BarChart2 className="w-3.5 h-3.5 text-primary" />
-                                CTD Depth Profile Chart
+                                {message.dataType === "time_series"
+                                  ? "ARGO Temporal Time Series & Anomaly Graph"
+                                  : message.dataType === "monthly_averages"
+                                  ? "12-Month Climatological Seasonal Cycle Chart"
+                                  : message.dataType === "gridded_climatology"
+                                  ? "Gridded Ocean Climatology Horizons (RG-Argo / WOA)"
+                                  : "CTD Vertical Depth Stratification Chart"}
                               </span>
                               <div className="flex items-center gap-1">
                                 <Button
@@ -918,7 +948,7 @@ export const ChatInterface = ({ isActive = true }: ChatInterfaceProps = {}) => {
                                   onClick={() => {
                                     const link = document.createElement("a");
                                     link.href = `data:image/png;base64,${message.graphImage}`;
-                                    link.download = "argo_ctd_profile.png";
+                                    link.download = `argo_${message.dataType || "ocean"}_profile.png`;
                                     link.click();
                                   }}
                                   className="h-6 text-[11px] px-2"
@@ -1070,26 +1100,42 @@ export const ChatInterface = ({ isActive = true }: ChatInterfaceProps = {}) => {
                   <button
                     type="button"
                     disabled={isLoading}
+                    onClick={() => setInputValue("Provide time series data and temporal evolution for ")}
+                    className="text-[11px] px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 transition-colors whitespace-nowrap disabled:opacity-50"
+                  >
+                    📈 Time Series
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => setInputValue("Show me monthly averages and seasonal cycles for ")}
+                    className="text-[11px] px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300 transition-colors whitespace-nowrap disabled:opacity-50"
+                  >
+                    🗓️ Monthly Averages
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => setInputValue("Provide gridded climatology data across standard depth horizons in ")}
+                    className="text-[11px] px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 transition-colors whitespace-nowrap disabled:opacity-50"
+                  >
+                    🌐 Gridded Climatology
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => setInputValue("Generate a full vertical profile down to 2000m depth for float ")}
+                    className="text-[11px] px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 text-indigo-400 hover:text-indigo-300 transition-colors whitespace-nowrap disabled:opacity-50"
+                  >
+                    🔬 Vertical Profile
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isLoading}
                     onClick={() => setInputValue("Show me a map of ARGO float locations in ")}
                     className="text-[11px] px-2 py-0.5 rounded-md bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap disabled:opacity-50"
                   >
                     🗺️ Map
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isLoading}
-                    onClick={() => setInputValue("Show me a graph of temperature vs depth in ")}
-                    className="text-[11px] px-2 py-0.5 rounded-md bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap disabled:opacity-50"
-                  >
-                    📊 Graph
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isLoading}
-                    onClick={() => setInputValue("Analyze salinity anomalies in ")}
-                    className="text-[11px] px-2 py-0.5 rounded-md bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap disabled:opacity-50"
-                  >
-                    🧂 Salinity
                   </button>
                 </div>
 
