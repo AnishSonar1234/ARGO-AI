@@ -167,15 +167,16 @@ def _format_vertical_profile_table(df: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
-def _format_current_observations_table(df: pd.DataFrame) -> str:
+def _format_current_observations_table(df: pd.DataFrame, region: Optional[str] = None) -> str:
     """Formats current float observations into a readable summary."""
     if df.empty:
         return "No recent float observation records available."
     sample_rows = min(len(df), 12)
+    reg_title = (region or (df['region'].iloc[0] if 'region' in df.columns else "Global Ocean")).title()
     lines = [
-        "### Recent In-Situ Float Telemetry Records",
-        "| Float ID | Latitude | Longitude | Depth (m) | Temperature (°C) | Salinity (PSU) |",
-        "| :---: | :---: | :---: | :---: | :---: | :---: |"
+        f"### Recent In-Situ Float Telemetry Records ({reg_title})",
+        "| Float ID | Region | Latitude | Longitude | Depth (m) | Temperature (°C) | Salinity (PSU) |",
+        "| :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
     ]
     for _, row in df.head(sample_rows).iterrows():
         lat = row.get("latitude", 0.0)
@@ -184,7 +185,8 @@ def _format_current_observations_table(df: pd.DataFrame) -> str:
         sal = row.get("salinity", 0.0)
         depth = row.get("depth", 0.0)
         fid = row.get("float_id", "UNKNOWN")
-        lines.append(f"| {fid} | {lat:.2f}° | {lon:.2f}° | {depth:.1f} | {temp:.2f} | {sal:.2f} |")
+        reg_val = row.get("region", reg_title)
+        lines.append(f"| {fid} | {reg_val} | {lat:.2f}° | {lon:.2f}° | {depth:.1f} | {temp:.2f} | {sal:.2f} |")
     return "\n".join(lines)
 
 
@@ -230,8 +232,7 @@ class OceanLangChainAgent:
 
         try:
             if parsed.data_type == "time_series":
-                float_id = parsed.float_id or "2903334"
-                live_df = get_time_series_data(region=parsed.region, float_id=float_id, days=180)
+                live_df = get_time_series_data(region=parsed.region, float_id=parsed.float_id, days=180)
                 live_data_summary = _format_time_series_table(live_df)
 
             elif parsed.data_type == "monthly_averages":
@@ -243,17 +244,16 @@ class OceanLangChainAgent:
                 live_data_summary = _format_gridded_climatology_table(live_df)
 
             elif parsed.data_type == "vertical_profile":
-                float_id = parsed.float_id or "2903334"
-                live_df = get_full_vertical_profile_data(float_id=float_id, region=parsed.region, max_depth=2000.0)
+                live_df = get_full_vertical_profile_data(float_id=parsed.float_id, region=parsed.region, max_depth=2000.0)
                 live_data_summary = _format_vertical_profile_table(live_df)
 
             elif parsed.intent == "map_visualization":
                 live_df = _fetch_locations(parsed.region)
-                live_data_summary = _format_current_observations_table(live_df)
+                live_data_summary = _format_current_observations_table(live_df, region=parsed.region)
 
             else:
                 live_df = _fetch_data(parsed.region, days_back=7)
-                live_data_summary = _format_current_observations_table(live_df)
+                live_data_summary = _format_current_observations_table(live_df, region=parsed.region)
 
         except Exception as data_err:
             print(f"[Data] Notice fetching domain data ({parsed.data_type}): {data_err}")
@@ -263,29 +263,29 @@ class OceanLangChainAgent:
             "time_series": (
                 "The user requested TIME SERIES DATA. You MUST:\n"
                 "1. Reference the quantitative cycle-by-cycle numbers from the telemetry table (exact dates, temperatures, anomalies, MLD, heat content).\n"
-                "2. Provide deep physical oceanographic inferences explaining the temporal trends, seasonal heating/cooling rates, mixed layer deepening, and steric height implications.\n"
+                "2. Provide deep physical oceanographic inferences explaining the temporal trends, seasonal heating/cooling rates, mixed layer deepening, and steric height implications for the requested ocean body.\n"
                 "3. Conclude with an oceanographic outlook on the water column stability."
             ),
             "monthly_averages": (
                 "The user requested MONTHLY AVERAGES (Climatology). You MUST:\n"
-                "1. Explicitly present and analyze the 12-month annual cycle table (temperatures, salinities, standard deviations, and MLDs).\n"
-                "2. Explain the physical mechanisms driving the annual cycle (monsoonal reversals, winter convective overturn, summer stratification, upwelling/downwelling dynamics).\n"
-                "3. Detail the thermocline depth shoaling and deepening phases across the year."
+                "1. Explicitly present and analyze the 12-month annual cycle table (temperatures, salinities, standard deviations, and MLDs) for the requested ocean body.\n"
+                "2. Explain the physical mechanisms driving the annual cycle (insolation, seasonal overturn, summer stratification, upwelling/downwelling, and salinity fluctuations).\n"
+                "3. Detail the thermocline depth shoaling and deepening phases across the calendar year."
             ),
             "gridded_climatology": (
                 "The user requested GRIDDED CLIMATOLOGY DATA. You MUST:\n"
-                "1. Reference the standard depth horizons (0m to 2000m) from objectively analyzed Argo products (RG-Argo / WOA).\n"
-                "2. Identify the key oceanographic water masses across depth (Mixed Layer, Central Water, Antarctic Intermediate Water / Red Sea Water, Deep Water).\n"
+                "1. Reference the standard depth horizons (0m to 2000m) from objectively analyzed Argo products (RG-Argo / WOA) for the requested ocean basin.\n"
+                "2. Identify the key oceanographic water masses across depth (Surface Mixed Layer, Mode Water, Intermediate Water, Deep Water Core).\n"
                 "3. Explain the potential density (sigma-theta) stratification and isobaric objective interpolation methodology."
             ),
             "vertical_profile": (
                 "The user requested FULL VERTICAL PROFILES (CTD Soundings). You MUST:\n"
-                "1. Reference the exact soundings from the surface (0m) to the bathypelagic abyss (2000m), citing exact temperatures, practical salinities, and densities.\n"
+                "1. Reference the exact soundings from the surface (0m) to the bathypelagic abyss (2000m), citing exact temperatures, practical salinities, and densities for the requested ocean body.\n"
                 "2. Systematically dissect each stratification zone: Mixed Layer Depth (MLD), Main Thermocline, Halocline, Pycnocline stability barrier, and SOFAR acoustic sound channel axis.\n"
                 "3. Provide physical oceanographic conclusions on water column stability and buoyancy frequency."
             ),
             "current_observations": (
-                "Provide accurate, scientifically rigorous inferences and insights on the recent ARGO float measurements, "
+                "Provide accurate, scientifically rigorous inferences and insights on the recent ARGO float measurements in the requested ocean body, "
                 "referencing exact float IDs, coordinates, temperatures, and salinities."
             )
         }
@@ -293,11 +293,13 @@ class OceanLangChainAgent:
         specific_instruction = modality_instructions.get(parsed.data_type, modality_instructions["current_observations"])
 
         system_instruction = (
-            "You are ARGO-AI, an expert oceanographic intelligence assistant powered by global ARGO float data.\n"
+            "You are ARGO-AI Whale, an expert oceanographic intelligence assistant powered by global ARGO float data.\n"
+            "You cover ALL ocean bodies and seas on Earth: the Pacific, Atlantic, Indian, Southern, and Arctic Oceans, "
+            "as well as all marginal seas (Mediterranean, Red Sea, Caribbean, Coral Sea, Tasman Sea, Baltic, Bering, etc.).\n"
             "You provide rigorous scientific inferences, quantitative data analysis, and rich physical explanations.\n\n"
             f"=== Modality Mandate ===\n{specific_instruction}\n\n"
             "Format your response with clean markdown headings, quantitative references to the provided telemetry, "
-            "and concise oceanographic takeaways."
+            "and concise oceanographic takeaways tailored specifically to the user's requested ocean region."
         )
 
         augmented_parts = []
@@ -345,13 +347,13 @@ class OceanLangChainAgent:
             try:
                 if live_df is None or live_df.empty:
                     if parsed.data_type == "time_series":
-                        live_df = get_time_series_data(parsed.region, parsed.float_id or "2903334")
+                        live_df = get_time_series_data(parsed.region, parsed.float_id)
                     elif parsed.data_type == "monthly_averages":
                         live_df = get_monthly_averages_data(parsed.region, parsed.float_id)
                     elif parsed.data_type == "gridded_climatology":
                         live_df = get_gridded_climatology_data(parsed.region)
                     elif parsed.data_type == "vertical_profile":
-                        live_df = get_full_vertical_profile_data(parsed.float_id or "2903334", parsed.region)
+                        live_df = get_full_vertical_profile_data(parsed.float_id, parsed.region)
                     else:
                         live_df = _fetch_data(parsed.region, days_back=7)
 
