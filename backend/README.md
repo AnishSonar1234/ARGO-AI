@@ -39,11 +39,14 @@ PORT=5000
 .\venv\Scripts\activate   # Windows
 source venv/bin/activate  # Linux/macOS
 
-# 2. Start Flask Server
+# 2. Start Production WSGI Server (Waitress)
 python main.py
 ```
 
-Server runs on: **`http://localhost:5000`**
+- Production WSGI Server: **Waitress** with multi-threaded concurrency (configurable via `WAITRESS_THREADS=8`).
+- Server runs on: **`http://localhost:5000`**
+- Set `FLASK_DEBUG=true` in `.env` if you want local development auto-reload.
+
 
 ---
 

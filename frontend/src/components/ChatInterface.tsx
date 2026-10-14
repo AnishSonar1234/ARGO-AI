@@ -520,10 +520,28 @@ export const ChatInterface = ({ isActive = true }: ChatInterfaceProps = {}) => {
       } catch (e) {}
 
     } catch (err: any) {
-      setServerStatus("offline");
+      const errText = err?.message || "Connection refused";
+      const isRateLimit = errText.includes("429") || errText.toLowerCase().includes("rate limit") || errText.toLowerCase().includes("overloaded");
+      const isAuthError = errText.includes("401") || errText.toLowerCase().includes("api key");
+
+      if (isRateLimit) {
+        setServerStatus("connected");
+      } else if (!isAuthError) {
+        setServerStatus("offline");
+      }
+
+      let contentBody = "";
+      if (isRateLimit) {
+        contentBody = `⏳ **Whale AI Capacity Notice**: The upstream OpenRouter AI provider is temporarily handling high global traffic (Rate Limit 429).\n\n*${errText}*\n\nPlease wait a few seconds and send your query again.`;
+      } else if (isAuthError) {
+        contentBody = `🔑 **API Key Configuration**: ${errText}\n\nPlease verify your \`OPENROUTER_API_KEY\` in \`backend/.env\`.`;
+      } else {
+        contentBody = `⚠️ **Whale Connection Alert**: Could not receive response from ARGO backend server.\n\n*Details: ${errText}*\n\nPlease make sure the Python Flask backend is running on \`http://localhost:5000\`.`;
+      }
+
       const errorMsg: Message = {
         id: `msg_err_${Date.now()}`,
-        content: `⚠️ **Whale Connection Alert**: Could not receive response from ARGO backend server.\n\n*Details: ${err?.message || "Connection refused"}*\n\nPlease make sure the Python Flask backend is running on \`http://localhost:5000\`.`,
+        content: contentBody,
         sender: "ai",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
       };

@@ -3,11 +3,16 @@ ARGO-AI Platform - Backend Service Entry Point
 Streamlined Flask router delegating to app.agent, app.rag, and app.tools.
 """
 import os
+import sys
 import json
+import time
 import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
+
+# Ensure backend root is on sys.path for direct module execution
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Load environment variables before importing app modules
 load_dotenv()
@@ -26,6 +31,12 @@ CORS(app)
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
+FALLBACK_MODELS = [
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "nvidia/nemotron-3.5-lightning:free",
+]
 
 
 def get_openrouter_api_key() -> str:
@@ -35,13 +46,24 @@ def get_openrouter_api_key() -> str:
     return api_key
 
 
+def get_candidate_models() -> list:
+    """Return prioritized list of models to try for resilience against provider rate limits (429/503)."""
+    env_model = os.getenv("OPENROUTER_MODEL")
+    candidates = []
+    if env_model:
+        candidates.append(env_model.strip())
+    for m in FALLBACK_MODELS:
+        if m not in candidates:
+            candidates.append(m)
+    return candidates
+
+
 def call_openrouter_chat(messages, max_tokens=None, temperature=None) -> dict:
     """
-    Call OpenRouter chat completions API preserving reasoning_details.
+    Call OpenRouter chat completions API with automatic model fallback and exponential backoff.
+    Guarantees resilient handling of 429 (Provider returned error) and 503 (Provider overloaded).
     """
     api_key = get_openrouter_api_key()
-    model = os.getenv("OPENROUTER_MODEL", DEFAULT_MODEL)
-
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -49,44 +71,86 @@ def call_openrouter_chat(messages, max_tokens=None, temperature=None) -> dict:
         "X-Title": "ARGO-AI Platform"
     }
 
-    payload = {
-        "model": model,
-        "messages": messages,
-        "reasoning": {"enabled": True}
-    }
-    if max_tokens:
-        payload["max_tokens"] = max_tokens
-    if temperature is not None:
-        payload["temperature"] = temperature
+    candidates = get_candidate_models()
+    last_error = None
 
-    response = requests.post(
-        url=OPENROUTER_URL,
-        headers=headers,
-        json=payload,
-        timeout=120
+    for idx, model in enumerate(candidates):
+        for attempt in range(2):
+            payload = {
+                "model": model,
+                "messages": messages,
+                "reasoning": {"enabled": True}
+            }
+            if max_tokens:
+                payload["max_tokens"] = max_tokens
+            if temperature is not None:
+                payload["temperature"] = temperature
+
+            try:
+                print(f"[OpenRouter] Requesting model '{model}' (attempt {attempt + 1}/2)...")
+                response = requests.post(
+                    url=OPENROUTER_URL,
+                    headers=headers,
+                    json=payload,
+                    timeout=90
+                )
+
+                if response.status_code == 200:
+                    res_json = response.json()
+                    if "error" in res_json:
+                        err_detail = res_json["error"].get("message", str(res_json["error"]))
+                        print(f"[OpenRouter] Provider returned body error on {model}: {err_detail}")
+                        last_error = err_detail
+                        time.sleep(1.0)
+                        continue
+
+                    choices = res_json.get("choices")
+                    if choices and len(choices) > 0:
+                        choice_msg = choices[0]["message"]
+                        print(f"[OpenRouter] Successfully generated response with '{model}'")
+                        return choice_msg
+                    else:
+                        print(f"[OpenRouter] Empty choices from {model}")
+                        last_error = "Empty response choices"
+                        continue
+
+                elif response.status_code in (429, 503, 502, 504):
+                    error_msg = f"HTTP {response.status_code}"
+                    try:
+                        err_json = response.json()
+                        if "error" in err_json:
+                            error_msg = err_json["error"].get("message", error_msg)
+                    except Exception:
+                        pass
+                    print(f"[OpenRouter] Rate limited / provider overloaded ({response.status_code}) on {model}: {error_msg}")
+                    last_error = f"{model} ({response.status_code}): {error_msg}"
+                    time.sleep(1.2 * (attempt + 1))
+                    continue
+
+                else:
+                    error_msg = response.text
+                    try:
+                        err_json = response.json()
+                        if "error" in err_json:
+                            error_msg = err_json["error"].get("message", error_msg)
+                    except Exception:
+                        pass
+                    print(f"[OpenRouter] Error ({response.status_code}) on {model}: {error_msg}")
+                    last_error = f"{model} ({response.status_code}): {error_msg}"
+                    if response.status_code in (401, 403):
+                        raise RuntimeError(f"OpenRouter authentication failed: {error_msg}")
+                    break
+
+            except requests.exceptions.RequestException as req_err:
+                print(f"[OpenRouter] Network exception on {model}: {req_err}")
+                last_error = str(req_err)
+                time.sleep(1.0)
+                continue
+
+    raise RuntimeError(
+        f"OpenRouter rate limit or provider error: {last_error}. "
+        "The free-tier model capacity is temporarily overloaded. Please try again in a few moments."
     )
-
-    if response.status_code != 200:
-        error_msg = response.text
-        try:
-            err_json = response.json()
-            if "error" in err_json:
-                error_msg = err_json["error"].get("message", error_msg)
-        except Exception:
-            pass
-        print(f"[OpenRouter] API error ({response.status_code}): {error_msg}")
-        raise RuntimeError(f"OpenRouter API error ({response.status_code}): {error_msg}")
-
-    res_json = response.json()
-    if "error" in res_json:
-        err_detail = res_json["error"].get("message", str(res_json["error"]))
-        raise RuntimeError(f"OpenRouter upstream error: {err_detail}")
-
-    choices = res_json.get("choices")
-    if not choices or len(choices) == 0:
-        raise RuntimeError("OpenRouter returned empty response")
-
-    return choices[0]["message"]
 
 
 # ============================================================================
@@ -117,11 +181,22 @@ def chat():
         return jsonify(result)
 
     except RuntimeError as e:
-        return jsonify({"error": "API configuration error: " + str(e)}), 500
+        err_str = str(e)
+        if "401" in err_str or "authentication" in err_str.lower():
+            return jsonify({"error": "Invalid API key. Please check your OpenRouter API key."}), 401
+        if "429" in err_str or "rate limit" in err_str.lower() or "overloaded" in err_str.lower():
+            return jsonify({
+                "error": "Whale AI is experiencing high global traffic on OpenRouter free endpoints (Rate Limit 429). The system attempted fallback models. Please wait a few seconds and try again."
+            }), 429
+        return jsonify({"error": err_str}), 500
     except Exception as e:
         error_msg = str(e)
         if "401" in error_msg or "User not found" in error_msg:
             return jsonify({"error": "Invalid API key. Please check your OpenRouter API key."}), 401
+        if "429" in error_msg or "rate limit" in error_msg.lower() or "overloaded" in error_msg.lower():
+            return jsonify({
+                "error": "Whale AI is experiencing high global traffic on OpenRouter (Rate Limit 429). Please wait a few seconds and try again."
+            }), 429
         return jsonify({"error": "Server error: " + error_msg}), 500
 
 
@@ -167,6 +242,22 @@ def dashboard_profile():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5000"))
+    host = os.environ.get("HOST", "0.0.0.0")
     debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() in ("true", "1")
-    print(f"[ARGO-AI] Starting server on http://0.0.0.0:{port} (threaded=True, debug={debug_mode})")
-    app.run(host="0.0.0.0", port=port, debug=debug_mode, threaded=True)
+
+    if debug_mode:
+        print(f"[ARGO-AI] Starting Flask development server on http://{host}:{port} (debug=True)")
+        app.run(host=host, port=port, debug=True)
+    else:
+        try:
+            from waitress import serve
+            threads = int(os.environ.get("WAITRESS_THREADS", "8"))
+            print("=" * 60)
+            print(f"[ARGO-AI] Production WSGI Server (Waitress) active")
+            print(f"[ARGO-AI] Listening on http://{host}:{port} with {threads} worker threads")
+            print(f"[ARGO-AI] Production telemetry, NLP parsing, and RAG ready")
+            print("=" * 60)
+            serve(app, host=host, port=port, threads=threads)
+        except ImportError:
+            print(f"[ARGO-AI] Waitress not found, starting threaded Flask runner on http://{host}:{port}")
+            app.run(host=host, port=port, threaded=True)

@@ -20,4 +20,6 @@ langchain-community
 langchain-openai
 chromadb
 pydantic
+waitress>=3.0.0
+
 
