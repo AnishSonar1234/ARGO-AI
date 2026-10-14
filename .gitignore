@@ -110,3 +110,9 @@ dist/
 # Local Vector Database
 chroma_db/
 *.sqlite3
+
+# Screenshots & Captured Debug Media
+Screenshot*.png
+Screenshot*.jpg
+Screenshot*.jpeg
+

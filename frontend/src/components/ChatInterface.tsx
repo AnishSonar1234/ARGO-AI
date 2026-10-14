@@ -91,7 +91,11 @@ const INITIAL_SUGGESTIONS = [
   }
 ];
 
-export const ChatInterface = () => {
+interface ChatInterfaceProps {
+  isActive?: boolean;
+}
+
+export const ChatInterface = ({ isActive = true }: ChatInterfaceProps = {}) => {
   // Load or initialize sessions
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
     try {
@@ -148,58 +152,88 @@ export const ChatInterface = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatScrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const respondingStartTimeRef = useRef<number | null>(null);
 
   // Active session helper
   const activeSession = sessions.find(s => s.id === activeSessionId) || sessions[0];
   const messages = activeSession?.messages || [];
 
-  // Check backend server connection on mount
-  useEffect(() => {
-    const checkServer = async () => {
-      try {
-        const baseUrl = import.meta.env.VITE_BACKEND_URL 
-          ? import.meta.env.VITE_BACKEND_URL.replace("/chat", "") 
-          : "http://localhost:5000";
-        const res = await fetch(`${baseUrl}/api/rag/status`);
-        if (res.ok) {
-          setServerStatus("connected");
-        } else {
-          setServerStatus("offline");
-        }
-      } catch {
+  // Check backend server connection
+  const checkServer = async () => {
+    try {
+      const baseUrl = import.meta.env.VITE_BACKEND_URL 
+        ? import.meta.env.VITE_BACKEND_URL.replace("/chat", "") 
+        : "http://localhost:5000";
+      const res = await fetch(`${baseUrl}/api/rag/status`);
+      if (res.ok) {
+        setServerStatus("connected");
+      } else {
         setServerStatus("offline");
       }
-    };
+    } catch {
+      setServerStatus("offline");
+    }
+  };
+
+  useEffect(() => {
     checkServer();
   }, []);
 
-  // Timer while Whale is responding
+  // Timer while Whale is responding (robust against browser tab switching & throttling)
   useEffect(() => {
     let timer: any = null;
     if (isLoading) {
-      setElapsedSeconds(0);
-      timer = setInterval(() => {
-        setElapsedSeconds(prev => prev + 1);
-      }, 1000);
+      if (!respondingStartTimeRef.current) {
+        respondingStartTimeRef.current = Date.now();
+      }
+      const updateElapsed = () => {
+        if (respondingStartTimeRef.current) {
+          const sec = Math.max(0, Math.floor((Date.now() - respondingStartTimeRef.current) / 1000));
+          setElapsedSeconds(sec);
+        }
+      };
+      updateElapsed();
+      timer = setInterval(updateElapsed, 500);
+
+      const handleVisibilityOrFocus = () => {
+        updateElapsed();
+      };
+      document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.addEventListener("focus", handleVisibilityOrFocus);
+
+      return () => {
+        if (timer) clearInterval(timer);
+        document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+        window.removeEventListener("focus", handleVisibilityOrFocus);
+      };
     } else {
+      respondingStartTimeRef.current = null;
       setElapsedSeconds(0);
     }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
   }, [isLoading]);
 
-  // Check if a prefilled prompt was set by Dashboard (e.g. "Ask AI About Float")
+  // When active tab becomes Whale Chat (or on mount), check prefilled prompt and restore focus/scroll
   useEffect(() => {
-    const prefill = sessionStorage.getItem("argo_selected_float_query");
-    if (prefill) {
-      setInputValue(prefill);
-      sessionStorage.removeItem("argo_selected_float_query");
-      if (textareaRef.current) {
-        textareaRef.current.focus();
+    if (isActive) {
+      const prefill = sessionStorage.getItem("argo_selected_float_query");
+      if (prefill) {
+        setInputValue(prefill);
+        sessionStorage.removeItem("argo_selected_float_query");
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.focus();
+            textareaRef.current.style.height = "auto";
+            textareaRef.current.style.height = `${Math.min(Math.max(textareaRef.current.scrollHeight, 44), 180)}px`;
+          }
+        }, 50);
       }
+      checkServer();
+      setTimeout(() => {
+        scrollToBottom("auto");
+      }, 50);
     }
-  }, []);
+  }, [isActive]);
+
 
   // Save sessions to localStorage
   useEffect(() => {
@@ -354,6 +388,9 @@ export const ChatInterface = () => {
     const prompt = (textToSend ?? inputValue).trim();
     if (!prompt || isLoading) return;
 
+    const targetSessionId = activeSessionId;
+    const currentSession = sessions.find(s => s.id === targetSessionId) || activeSession;
+
     const userMessage: Message = {
       id: `msg_u_${Date.now()}`,
       content: prompt,
@@ -362,9 +399,9 @@ export const ChatInterface = () => {
     };
 
     // Auto-update session title on first message
-    const updatedMessages = [...messages, userMessage];
+    const updatedMessages = [...(currentSession?.messages || []), userMessage];
     setSessions(prev => prev.map(s => {
-      if (s.id === activeSessionId) {
+      if (s.id === targetSessionId) {
         const isFirst = s.messages.length === 0;
         const newTitle = isFirst ? (prompt.length > 36 ? prompt.substring(0, 36) + "..." : prompt) : s.title;
         return {
@@ -377,13 +414,35 @@ export const ChatInterface = () => {
       return s;
     }));
 
+    // Synchronously write user message to localStorage so it is immediately persisted
+    try {
+      const savedRaw = localStorage.getItem(STORAGE_KEY_SESSIONS);
+      if (savedRaw) {
+        const parsed: ChatSession[] = JSON.parse(savedRaw);
+        const nextSessions = parsed.map(s => {
+          if (s.id === targetSessionId) {
+            const isFirst = s.messages.length === 0;
+            const newTitle = isFirst ? (prompt.length > 36 ? prompt.substring(0, 36) + "..." : prompt) : s.title;
+            return {
+              ...s,
+              title: newTitle,
+              updatedAt: Date.now(),
+              messages: [...s.messages, userMessage]
+            };
+          }
+          return s;
+        });
+        localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(nextSessions));
+      }
+    } catch (e) {}
+
     setInputValue("");
     if (textareaRef.current) textareaRef.current.style.height = "44px";
     setIsLoading(true);
 
     try {
       // Build conversation history including preserved reasoning_details
-      const history = messages.map(m => {
+      const history = (currentSession?.messages || []).map(m => {
         if (m.sender === "user") {
           return { role: "user", content: m.content };
         }
@@ -404,7 +463,12 @@ export const ChatInterface = () => {
       });
 
       if (!res.ok) {
-        throw new Error(`Server returned status ${res.status}`);
+        let errDetail = `Server returned status ${res.status}`;
+        try {
+          const errData = await res.json();
+          if (errData?.error) errDetail = errData.error;
+        } catch {}
+        throw new Error(errDetail);
       }
 
       const data = await res.json();
@@ -424,7 +488,8 @@ export const ChatInterface = () => {
 
       setServerStatus("connected");
       setSessions(prev => prev.map(s => {
-        if (s.id === activeSessionId) {
+        if (s.id === targetSessionId) {
+          if (s.messages.some(m => m.id === whaleResponse.id)) return s;
           return {
             ...s,
             updatedAt: Date.now(),
@@ -433,6 +498,27 @@ export const ChatInterface = () => {
         }
         return s;
       }));
+
+      // Directly update localStorage as well for guaranteed persistence
+      try {
+        const savedRaw = localStorage.getItem(STORAGE_KEY_SESSIONS);
+        if (savedRaw) {
+          const parsed: ChatSession[] = JSON.parse(savedRaw);
+          const nextSessions = parsed.map(s => {
+            if (s.id === targetSessionId) {
+              if (s.messages.some(m => m.id === whaleResponse.id)) return s;
+              return {
+                ...s,
+                updatedAt: Date.now(),
+                messages: [...s.messages, whaleResponse]
+              };
+            }
+            return s;
+          });
+          localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(nextSessions));
+        }
+      } catch (e) {}
+
     } catch (err: any) {
       setServerStatus("offline");
       const errorMsg: Message = {
@@ -442,7 +528,7 @@ export const ChatInterface = () => {
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
       };
       setSessions(prev => prev.map(s => {
-        if (s.id === activeSessionId) {
+        if (s.id === targetSessionId) {
           return {
             ...s,
             updatedAt: Date.now(),
@@ -451,6 +537,24 @@ export const ChatInterface = () => {
         }
         return s;
       }));
+
+      try {
+        const savedRaw = localStorage.getItem(STORAGE_KEY_SESSIONS);
+        if (savedRaw) {
+          const parsed: ChatSession[] = JSON.parse(savedRaw);
+          const nextSessions = parsed.map(s => {
+            if (s.id === targetSessionId) {
+              return {
+                ...s,
+                updatedAt: Date.now(),
+                messages: [...s.messages, errorMsg]
+              };
+            }
+            return s;
+          });
+          localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(nextSessions));
+        }
+      } catch (e) {}
     } finally {
       setIsLoading(false);
     }
