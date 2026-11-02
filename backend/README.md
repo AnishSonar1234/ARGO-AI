@@ -60,4 +60,4 @@ python main.py
 .\venv\Scripts\python.exe tests/test_chat_endpoint.py
 ```
 
-For full system documentation and architectural diagrams, see the root [README.md](../README.md).
+For full system documentation, architectural diagrams, and comprehensive [LLM Performance & Evaluation Metrics](../README.md#-llm-performance--evaluation-metrics), see the root [README.md](../README.md).
